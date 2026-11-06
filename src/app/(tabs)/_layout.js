@@ -109,6 +109,21 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
+        name="perfil/index"
+        options={{
+          title: "Perfil",
+          headerTitle: "Meu Perfil",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="account-circle-outline"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
         name="sobre"
         options={{
           title: "Sobre",
