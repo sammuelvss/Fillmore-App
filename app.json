@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Fillmore Transporte Escolar",
+    "slug": "fillmore-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "fillmore",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#1E293B",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.unicap.fillmore"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F59E0B"
+      },
+      "package": "com.unicap.fillmore"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
