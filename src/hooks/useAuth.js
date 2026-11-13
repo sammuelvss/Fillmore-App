@@ -18,14 +18,12 @@ const profileKey = (userId) => ["user-profile", userId];
 export const useLoginMutation = () => {
   const setAuth = useAuthStore((s) => s.setAuth);
   const showSnackbar = useAppStore((s) => s.showSnackbar);
-  const router = useRouter();
 
   return useMutation({
     mutationFn: loginRequest,
     onSuccess: ({ user, token }) => {
       setAuth(user, token);
       showSnackbar(`Bem-vindo(a), ${user?.nome || "usuário"}!`, "success");
-      router.replace("/(tabs)");
     },
     onError: (e) =>
       showSnackbar(e.friendlyMessage || "Falha ao autenticar.", "error"),
@@ -52,13 +50,11 @@ export const useLogoutMutation = () => {
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const showSnackbar = useAppStore((s) => s.showSnackbar);
   const queryClient = useQueryClient();
-  const router = useRouter();
 
   const sair = (msg) => {
     clearAuth();
     queryClient.clear();
     if (msg) showSnackbar(msg, "info");
-    router.replace("/(auth)/login");
   };
 
   return useMutation({
@@ -99,7 +95,6 @@ export const useDeleteAccountMutation = () => {
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const showSnackbar = useAppStore((s) => s.showSnackbar);
   const queryClient = useQueryClient();
-  const router = useRouter();
 
   return useMutation({
     mutationFn: deleteUserAccount,
@@ -107,7 +102,6 @@ export const useDeleteAccountMutation = () => {
       clearAuth();
       queryClient.clear();
       showSnackbar("Conta excluída.", "info");
-      router.replace("/(auth)/login");
     },
     onError: (e) =>
       showSnackbar(e.friendlyMessage || "Não foi possível excluir.", "error"),

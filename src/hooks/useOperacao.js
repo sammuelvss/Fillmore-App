@@ -133,9 +133,10 @@ export const useCancelarViagemMutation = () => {
     mutationFn: cancelarViagemDiaria,
     onSuccess: (_, { alunoId }) => {
       queryClient.invalidateQueries({ queryKey: OPERACAO_KEYS.viagens(alunoId) });
-      // Back-end gera uma notificação automática ao cancelar viagem
+      // Back-end gera uma notificação automática ao cancelar viagem e remove da rota do dia
       queryClient.invalidateQueries({ queryKey: OPERACAO_KEYS.notificacoes(alunoId) });
       queryClient.invalidateQueries({ queryKey: ["notificacoes-responsavel"] });
+      queryClient.invalidateQueries({ queryKey: ["rotas"] });
       showSnackbar("Viagem cancelada e aviso enviado!", "success");
     },
     onError: (e) => showSnackbar(e.friendlyMessage || "Erro ao cancelar viagem.", "error"),
@@ -150,6 +151,9 @@ export const useRemoverViagemMutation = () => {
     mutationFn: removerViagemDiaria,
     onSuccess: (_, { alunoId }) => {
       queryClient.invalidateQueries({ queryKey: OPERACAO_KEYS.viagens(alunoId) });
+      queryClient.invalidateQueries({ queryKey: OPERACAO_KEYS.notificacoes(alunoId) });
+      queryClient.invalidateQueries({ queryKey: ["notificacoes-responsavel"] });
+      queryClient.invalidateQueries({ queryKey: ["rotas"] });
       showSnackbar("Cancelamento desfeito. Viagem reativada!", "info");
     },
     onError: (e) => showSnackbar(e.friendlyMessage || "Erro ao reativar viagem.", "error"),

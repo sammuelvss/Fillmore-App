@@ -18,6 +18,7 @@ export default function SignUpScreen() {
   const signUp = useSignUpMutation();
 
   const [tipo, setTipo] = useState("MOTORISTA");
+  const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({
     nome: "",
     email: "",
@@ -104,7 +105,15 @@ export default function SignUpScreen() {
           <Text variant="titleMedium" style={styles.section}>Dados de acesso</Text>
           {campo("Nome completo *", "nome")}
           {campo("E-mail *", "email", { keyboardType: "email-address", autoCapitalize: "none" })}
-          {campo("Senha * (mín. 6)", "senha", { secureTextEntry: true })}
+          {campo("Senha * (mín. 6)", "senha", {
+            secureTextEntry: !showPassword,
+            right: (
+              <TextInput.Icon
+                icon={showPassword ? "eye-off" : "eye"}
+                onPress={() => setShowPassword((v) => !v)}
+              />
+            ),
+          })}
           {campo("Telefone", "telefone", { keyboardType: "phone-pad" })}
 
           {tipo === "MOTORISTA" && (
