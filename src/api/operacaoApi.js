@@ -1,32 +1,11 @@
 import apiClient from "./client";
 
-/**
- * ============================================================================
- * MÓDULO DE API: OPERAÇÃO DIÁRIA (Responsável: EDMUNDO — 5º a atuar)
- * ============================================================================
- * Endpoints do Back-end Express 5:
- * 1. Check-list Diário de Presença (Embarque):
- *    - GET    /alunos/:alunoId/presencas
- *    - POST   /alunos/:alunoId/presencas
- *    - PUT    /alunos/:alunoId/presencas/:id
- *    - DELETE /alunos/:alunoId/presencas/:id
- *
- * 2. Cancelamento Pontual de Viagem Diária:
- *    - GET    /alunos/:alunoId/viagens
- *    - POST   /alunos/:alunoId/viagens
- *
- * 3. Central de Avisos / Notificações Operacionais:
- *    - GET    /alunos/:alunoId/notificacoes
- *    - POST   /alunos/:alunoId/notificacoes
- *    - GET    /rotas/:rotaId/avisos
- *    - POST   /rotas/:rotaId/avisos
- *    - PATCH  /notificacoes/:id/lida
- */
+// API de Operação Diária: presenças, viagens e notificações
 
-// --- PRESENÇAS (CHECK-LIST DIÁRIO) ---
+// --- PRESENÇAS ---
 
-export const getPresencasDoAluno = async (alunoId) => {
-  const response = await apiClient.get(`/alunos/${alunoId}/presencas`);
+export const getPresencasDoAluno = async (alunoId, params) => {
+  const response = await apiClient.get(`/alunos/${alunoId}/presencas`, { params });
   return response.data;
 };
 
@@ -36,10 +15,7 @@ export const registrarPresenca = async ({ alunoId, data }) => {
 };
 
 export const atualizarPresenca = async ({ alunoId, presencaId, data }) => {
-  const response = await apiClient.put(
-    `/alunos/${alunoId}/presencas/${presencaId}`,
-    data,
-  );
+  const response = await apiClient.put(`/alunos/${alunoId}/presencas/${presencaId}`, data);
   return response.data;
 };
 
@@ -48,10 +24,10 @@ export const removerPresenca = async ({ alunoId, presencaId }) => {
   return presencaId;
 };
 
-// --- CANCELAMENTO DE VIAGENS DIÁRIAS ---
+// --- VIAGENS DIÁRIAS ---
 
-export const getViagensDoAluno = async (alunoId) => {
-  const response = await apiClient.get(`/alunos/${alunoId}/viagens`);
+export const getViagensDoAluno = async (alunoId, params) => {
+  const response = await apiClient.get(`/alunos/${alunoId}/viagens`, { params });
   return response.data;
 };
 
@@ -60,19 +36,41 @@ export const cancelarViagemDiaria = async ({ alunoId, data }) => {
   return response.data;
 };
 
+export const atualizarViagemDiaria = async ({ alunoId, viagemId, data }) => {
+  const response = await apiClient.put(`/alunos/${alunoId}/viagens/${viagemId}`, data);
+  return response.data;
+};
+
+export const removerViagemDiaria = async ({ alunoId, viagemId }) => {
+  await apiClient.delete(`/alunos/${alunoId}/viagens/${viagemId}`);
+  return viagemId;
+};
+
 // --- AVISOS E NOTIFICAÇÕES ---
 
-export const getNotificacoesDoAluno = async (alunoId) => {
-  const response = await apiClient.get(`/alunos/${alunoId}/notificacoes`);
+export const getNotificacoesDoAluno = async (alunoId, params) => {
+  const response = await apiClient.get(`/alunos/${alunoId}/notificacoes`, { params });
+  return response.data;
+};
+
+export const getNotificacoesDoResponsavel = async (responsavelId, params) => {
+  const response = await apiClient.get(`/responsaveis/${responsavelId}/notificacoes`, { params });
   return response.data;
 };
 
 export const criarNotificacaoAluno = async ({ alunoId, data }) => {
-  const response = await apiClient.post(
-    `/alunos/${alunoId}/notificacoes`,
-    data,
-  );
+  const response = await apiClient.post(`/alunos/${alunoId}/notificacoes`, data);
   return response.data;
+};
+
+export const atualizarNotificacao = async ({ alunoId, notificacaoId, data }) => {
+  const response = await apiClient.put(`/alunos/${alunoId}/notificacoes/${notificacaoId}`, data);
+  return response.data;
+};
+
+export const removerNotificacao = async ({ alunoId, notificacaoId }) => {
+  await apiClient.delete(`/alunos/${alunoId}/notificacoes/${notificacaoId}`);
+  return notificacaoId;
 };
 
 export const marcarNotificacaoComoLida = async (notificacaoId) => {
@@ -87,7 +85,12 @@ export default {
   removerPresenca,
   getViagensDoAluno,
   cancelarViagemDiaria,
+  atualizarViagemDiaria,
+  removerViagemDiaria,
   getNotificacoesDoAluno,
+  getNotificacoesDoResponsavel,
   criarNotificacaoAluno,
+  atualizarNotificacao,
+  removerNotificacao,
   marcarNotificacaoComoLida,
 };
