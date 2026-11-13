@@ -6,7 +6,6 @@ import {
   Button,
   Surface,
   HelperText,
-  SegmentedButtons,
 } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -14,6 +13,7 @@ import { colors } from "../../theme";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useAppStore } from "../../store/useAppStore";
 import { useLoginMutation } from "../../hooks/useAuth";
+import { getSessionRequest } from "../../api/authApi";
 import { API_BASE_URL } from "../../api/client";
 
 // Login (POST /session) + Quick Token para evitar o rate limit de 5 logins/15 min
@@ -30,7 +30,7 @@ export default function LoginScreen() {
 
   const [showDev, setShowDev] = useState(false);
   const [manualToken, setManualToken] = useState("");
-  const [manualTipo, setManualTipo] = useState("MOTORISTA");
+  const [loadingQuick, setLoadingQuick] = useState(false);
 
   const handleLogin = () => {
     if (!email.trim() || !senha.trim()) {
@@ -41,31 +41,24 @@ export default function LoginScreen() {
     loginMutation.mutate({ email: email.trim(), senha: senha.trim() });
   };
 
-  // Entra com um token colado do Postman (ou em modo preview, sem token)
-  const handleQuickToken = () => {
-    const isMotorista = manualTipo === "MOTORISTA";
-    const mockUser = {
-      id: "00000000-0000-4000-8000-000000000001",
-      nome: isMotorista ? "Motorista (Modo Dev)" : "Responsável (Modo Dev)",
-      email: "dev@fillmore.app",
-      tipo: manualTipo,
-      telefone: "",
-      motorista: isMotorista
-        ? {
-            id: "00000000-0000-4000-8000-000000000002",
-            placaVeiculo: "VAN-0000",
-            capacidadeVan: 15,
-            chavePix: "",
-            titularPix: "",
-          }
-        : null,
-      responsavel: isMotorista
-        ? null
-        : { id: "00000000-0000-4000-8000-000000000003" },
-    };
-    setAuth(mockUser, manualToken.trim() || "dev-preview-jwt-token");
-    showSnackbar("Modo Dev ativado.", "info");
-    router.replace("/(tabs)");
+  // Valida um token JWT real em GET /session (não consome o rate limit de POST /session)
+  const handleQuickToken = async () => {
+    const tokenLimpo = manualToken.trim().replace(/^Bearer\s+/i, "");
+    if (!tokenLimpo) {
+      showSnackbar("Cole um token JWT válido de POST /session.", "info");
+      return;
+    }
+
+    setLoadingQuick(true);
+    try {
+      const sessionUser = await getSessionRequest(tokenLimpo);
+      setAuth(sessionUser, tokenLimpo);
+      showSnackbar(`Sessão restaurada para ${sessionUser?.nome || "usuário"}!`, "success");
+    } catch (e) {
+      showSnackbar(e.friendlyMessage || "Token inválido ou expirado.", "error");
+    } finally {
+      setLoadingQuick(false);
+    }
   };
 
   const errorMsg =
@@ -152,18 +145,8 @@ export default function LoginScreen() {
 
           {showDev && (
             <View style={styles.devBody}>
-              <SegmentedButtons
-                value={manualTipo}
-                onValueChange={setManualTipo}
-                density="small"
-                buttons={[
-                  { value: "MOTORISTA", label: "Motorista" },
-                  { value: "RESPONSAVEL", label: "Responsável" },
-                ]}
-                style={styles.input}
-              />
               <TextInput
-                label="Token JWT (vazio = preview)"
+                label="Token JWT real (Bearer)"
                 mode="outlined"
                 dense
                 value={manualToken}
@@ -171,8 +154,14 @@ export default function LoginScreen() {
                 autoCapitalize="none"
                 style={styles.input}
               />
-              <Button mode="contained" onPress={handleQuickToken} buttonColor={colors.secondary}>
-                Acessar
+              <Button
+                mode="contained"
+                loading={loadingQuick}
+                disabled={loadingQuick}
+                onPress={handleQuickToken}
+                buttonColor={colors.secondary}
+              >
+                Acessar com Token
               </Button>
             </View>
           )}

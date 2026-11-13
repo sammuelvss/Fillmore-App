@@ -65,10 +65,29 @@ export const deleteRota = async (id) => {
   return id;
 };
 
+// Consulta o trajeto otimizado do dia (Rota Inteligente)
+export const getTrajetoOtimizado = async ({ id, data }) => {
+  const response = await apiClient.get(`/rotas/${id}/trajeto`, {
+    params: data ? { data } : undefined,
+  });
+  return response.data;
+};
+
+// Força o recálculo e persistência da melhor sequência de paradas
+export const otimizarRota = async ({ id, data }) => {
+  const response = await apiClient.post(
+    `/rotas/${id}/otimizar`,
+    data ? { data } : {},
+  );
+  return response.data;
+};
+
 export default {
   getRotas,
   getRotaById,
   createRota,
   updateRota,
   deleteRota,
+  getTrajetoOtimizado,
+  otimizarRota,
 };

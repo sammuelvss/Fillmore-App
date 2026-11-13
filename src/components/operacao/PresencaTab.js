@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, StyleSheet } from "react-native";
 import {
   Text,
@@ -39,6 +39,12 @@ export default function PresencaTab({
   const [turno, setTurno] = useState(
     turnoInicial === "TARDE" ? "TARDE" : "MANHA",
   );
+
+  useEffect(() => {
+    if (turnoInicial === "MANHA" || turnoInicial === "TARDE") {
+      setTurno(turnoInicial);
+    }
+  }, [turnoInicial]);
   const [horario, setHorario] = useState(getHoraAtual);
   const [formError, setFormError] = useState("");
 

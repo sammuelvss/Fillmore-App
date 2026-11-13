@@ -23,16 +23,24 @@ import {
 } from "../../hooks/useOperacao";
 import { formatarDataHoraBR, TIPO_AVISO_META } from "./helpers";
 
-const TIPOS_AVISO = [
+const TIPOS_MOTORISTA = [
   "VAN_CHEGANDO",
   "GERAL",
   "VIAGEM_CANCELADA",
   "COBRANCA_MENSALIDADE",
 ];
+const TIPOS_RESPONSAVEL = ["GERAL"];
 
 // Aba 3: Central de avisos e notificações
-export default function AvisosTab({ alunoId, isResponsavel, onConfirmDelete }) {
-  const [tipo, setTipo] = useState("VAN_CHEGANDO");
+export default function AvisosTab({
+  alunoId,
+  alunoNome,
+  isResponsavel,
+  onConfirmDelete,
+}) {
+  const tiposDisponiveis = isResponsavel ? TIPOS_RESPONSAVEL : TIPOS_MOTORISTA;
+  const [tipo, setTipo] = useState(isResponsavel ? "GERAL" : "VAN_CHEGANDO");
+  const tipoAtivo = tiposDisponiveis.includes(tipo) ? tipo : "GERAL";
   const [mensagem, setMensagem] = useState("");
   const [formError, setFormError] = useState("");
   const [escopo, setEscopo] = useState("ALUNO"); // "ALUNO" | "TODOS" (responsável)
@@ -78,7 +86,7 @@ export default function AvisosTab({ alunoId, isResponsavel, onConfirmDelete }) {
     criar.mutate(
       {
         alunoId,
-        data: { tipo, mensagem: mensagem.trim() },
+        data: { tipo: tipoAtivo, mensagem: mensagem.trim() },
       },
       {
         onSuccess: () => setMensagem(""),
@@ -90,39 +98,51 @@ export default function AvisosTab({ alunoId, isResponsavel, onConfirmDelete }) {
     <View>
       <Surface style={styles.card} elevation={1}>
         <Text variant="titleMedium" style={styles.cardTitle}>
-          Enviar Novo Aviso
+          {isResponsavel ? "Enviar Recado ao Motorista" : "Enviar Novo Aviso"}
         </Text>
+        {alunoNome ? (
+          <Text variant="labelSmall" style={styles.destinatarioText}>
+            Aluno: {alunoNome}
+          </Text>
+        ) : null}
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.chipsScroll}
-          contentContainerStyle={styles.chipsRow}
-        >
-          {TIPOS_AVISO.map((key) => {
-            const meta = TIPO_AVISO_META[key];
-            const selected = tipo === key;
-            return (
-              <Chip
-                key={key}
-                selected={selected}
-                onPress={() => handleSelectTipo(key)}
-                icon={meta.icon}
-                style={[styles.tipoChip, selected && { backgroundColor: meta.bg }]}
-                textStyle={selected ? { color: meta.color, fontWeight: "700" } : undefined}
-              >
-                {meta.label}
-              </Chip>
-            );
-          })}
-        </ScrollView>
+        {!isResponsavel && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.chipsScroll}
+            contentContainerStyle={styles.chipsRow}
+          >
+            {tiposDisponiveis.map((key) => {
+              const meta = TIPO_AVISO_META[key];
+              const selected = tipoAtivo === key;
+              return (
+                <Chip
+                  key={key}
+                  selected={selected}
+                  onPress={() => handleSelectTipo(key)}
+                  icon={meta.icon}
+                  style={[styles.tipoChip, selected && { backgroundColor: meta.bg }]}
+                  textStyle={selected ? { color: meta.color, fontWeight: "700" } : undefined}
+                >
+                  {meta.label}
+                </Chip>
+              );
+            })}
+          </ScrollView>
+        )}
 
         <TextInput
           label="Mensagem do aviso *"
           mode="outlined"
           multiline
           numberOfLines={3}
-          placeholder="Ex.: A van está chegando em 5 minutos."
+          maxLength={255}
+          placeholder={
+            isResponsavel
+              ? "Ex.: Hoje outro responsável vai aguardar no portão."
+              : "Ex.: A van está chegando em 5 minutos."
+          }
           value={mensagem}
           onChangeText={(v) => {
             setMensagem(v);
@@ -295,6 +315,10 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontWeight: "800",
     color: colors.secondary,
+    marginBottom: 4,
+  },
+  destinatarioText: {
+    color: colors.textSecondary,
     marginBottom: 10,
   },
   chipsScroll: {

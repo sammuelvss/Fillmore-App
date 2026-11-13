@@ -5,6 +5,8 @@ import {
   createRota,
   updateRota,
   deleteRota,
+  getTrajetoOtimizado,
+  otimizarRota,
 } from "../api/rotasApi";
 import { useAuthStore } from "../store/useAuthStore";
 import { useAppStore } from "../store/useAppStore";
@@ -116,6 +118,50 @@ export const useDeleteRotaMutation = () => {
     onError: (error) => {
       showSnackbar(
         error.friendlyMessage || "Não foi possível excluir a rota.",
+        "error",
+      );
+    },
+  });
+};
+
+export const useTrajetoOtimizadoQuery = (id, data, options = {}) => {
+  const token = useAuthStore((state) => state.token);
+
+  return useQuery({
+    queryKey: [...ROTAS_QUERY_KEY, "trajeto", id, data || "hoje"],
+    queryFn: () => getTrajetoOtimizado({ id, data }),
+    enabled:
+      Boolean(token) &&
+      Boolean(id) &&
+      (options.enabled !== undefined ? options.enabled : true),
+  });
+};
+
+export const useOtimizarRotaMutation = () => {
+  const queryClient = useQueryClient();
+  const showSnackbar = useAppStore((state) => state.showSnackbar);
+
+  return useMutation({
+    mutationFn: otimizarRota,
+    onSuccess: (trajeto, variables) => {
+      const id = variables?.id;
+      const dataKey = variables?.data || trajeto?.dataReferencia || "hoje";
+
+      if (id && trajeto) {
+        queryClient.setQueryData(
+          [...ROTAS_QUERY_KEY, "trajeto", id, dataKey],
+          trajeto,
+        );
+        queryClient.invalidateQueries({
+          queryKey: [...ROTAS_QUERY_KEY, "trajeto", id],
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ROTAS_QUERY_KEY });
+      showSnackbar("Rota recalculada com sucesso!", "success");
+    },
+    onError: (error) => {
+      showSnackbar(
+        error.friendlyMessage || "Não foi possível recalcular a rota.",
         "error",
       );
     },

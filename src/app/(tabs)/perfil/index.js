@@ -35,6 +35,7 @@ export default function PerfilScreen() {
   const van = perfil?.motorista;
 
   const [editando, setEditando] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({});
   const [error, setError] = useState("");
   const [dialog, setDialog] = useState(null); // "logout" | "delete" | null
@@ -46,11 +47,13 @@ export default function PerfilScreen() {
       nome: perfil?.nome || "",
       telefone: perfil?.telefone || "",
       senha: "",
+      cnh: van?.cnh || "",
       placaVeiculo: van?.placaVeiculo || "",
       capacidadeVan: String(van?.capacidadeVan || ""),
       chavePix: van?.chavePix || "",
       titularPix: van?.titularPix || "",
     });
+    setShowPassword(false);
     setError("");
     setEditando(true);
   };
@@ -64,13 +67,14 @@ export default function PerfilScreen() {
 
     const data = {
       nome: form.nome.trim(),
-      telefone: form.telefone.trim() || undefined,
+      telefone: form.telefone.trim() || null,
       ...(form.senha && { senha: form.senha }),
       ...(isMotorista && {
-        placaVeiculo: form.placaVeiculo.trim() || undefined,
+        cnh: form.cnh.trim() || null,
+        placaVeiculo: form.placaVeiculo.trim() || null,
         capacidadeVan: parseInt(form.capacidadeVan, 10),
-        chavePix: form.chavePix.trim() || undefined,
-        titularPix: form.titularPix.trim() || undefined,
+        chavePix: form.chavePix.trim() || null,
+        titularPix: form.titularPix.trim() || null,
       }),
     };
     update.mutate({ userId: user.id, data }, { onSuccess: () => setEditando(false) });
@@ -120,6 +124,7 @@ export default function PerfilScreen() {
               {linha("Telefone", perfil?.telefone)}
               {isMotorista && (
                 <>
+                  {linha("CNH", van?.cnh)}
                   {linha("Placa da van", van?.placaVeiculo)}
                   {linha("Capacidade", van?.capacidadeVan && `${van.capacidadeVan} alunos`)}
                   {linha("Chave Pix", van?.chavePix)}
@@ -134,9 +139,18 @@ export default function PerfilScreen() {
             <>
               {campo("Nome *", "nome")}
               {campo("Telefone", "telefone", { keyboardType: "phone-pad" })}
-              {campo("Nova senha (opcional)", "senha", { secureTextEntry: true })}
+              {campo("Nova senha (opcional)", "senha", {
+                secureTextEntry: !showPassword,
+                right: (
+                  <TextInput.Icon
+                    icon={showPassword ? "eye-off" : "eye"}
+                    onPress={() => setShowPassword((v) => !v)}
+                  />
+                ),
+              })}
               {isMotorista && (
                 <>
+                  {campo("CNH", "cnh", { keyboardType: "numeric" })}
                   {campo("Placa da van", "placaVeiculo", { autoCapitalize: "characters" })}
                   {campo("Capacidade (alunos)", "capacidadeVan", { keyboardType: "numeric" })}
                   {campo("Chave Pix", "chavePix")}
@@ -184,37 +198,49 @@ export default function PerfilScreen() {
       </ScrollView>
 
       <Portal>
-        <Dialog visible={dialog === "logout"} onDismiss={() => setDialog(null)}>
+        <Dialog
+          visible={dialog === "logout"}
+          onDismiss={() => !logout.isPending && setDialog(null)}
+        >
           <Dialog.Title>Sair da conta?</Dialog.Title>
           <Dialog.Content>
             <Text>O token será revogado e você precisará entrar novamente.</Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setDialog(null)}>Cancelar</Button>
+            <Button disabled={logout.isPending} onPress={() => setDialog(null)}>
+              Cancelar
+            </Button>
             <Button
-              onPress={() => {
-                setDialog(null);
-                logout.mutate();
-              }}
+              loading={logout.isPending}
+              disabled={logout.isPending}
+              onPress={() =>
+                logout.mutate(undefined, { onSettled: () => setDialog(null) })
+              }
             >
               Sair
             </Button>
           </Dialog.Actions>
         </Dialog>
 
-        <Dialog visible={dialog === "delete"} onDismiss={() => setDialog(null)}>
+        <Dialog
+          visible={dialog === "delete"}
+          onDismiss={() => !remove.isPending && setDialog(null)}
+        >
           <Dialog.Title>Excluir conta?</Dialog.Title>
           <Dialog.Content>
             <Text>Essa ação é irreversível e apaga seus dados do servidor.</Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setDialog(null)}>Cancelar</Button>
+            <Button disabled={remove.isPending} onPress={() => setDialog(null)}>
+              Cancelar
+            </Button>
             <Button
               textColor={colors.error}
-              onPress={() => {
-                setDialog(null);
-                remove.mutate(user.id);
-              }}
+              loading={remove.isPending}
+              disabled={remove.isPending}
+              onPress={() =>
+                remove.mutate(user.id, { onSettled: () => setDialog(null) })
+              }
             >
               Excluir
             </Button>

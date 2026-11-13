@@ -25,6 +25,13 @@ export default function RotasStackLayout() {
           presentation: "card",
         }}
       />
+      <Stack.Screen
+        name="trajeto"
+        options={{
+          title: "Rota Inteligente",
+          presentation: "card",
+        }}
+      />
     </Stack>
   );
 }

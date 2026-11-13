@@ -168,6 +168,49 @@ export default function OperacaoScreen() {
                   Escola: {alunoSelecionado.escola}
                 </Text>
               ) : null}
+
+              {alunoSelecionado?.rotaIdaId || alunoSelecionado?.rotaVoltaId ? (
+                <View style={styles.rotasShortcutRow}>
+                  {alunoSelecionado.rotaIdaId ? (
+                    <Button
+                      mode="outlined"
+                      compact
+                      icon="map-marker-path"
+                      style={styles.rotaShortcutBtn}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/(tabs)/rotas/trajeto",
+                          params: { id: alunoSelecionado.rotaIdaId },
+                        })
+                      }
+                    >
+                      {alunoSelecionado.rotaVoltaId &&
+                      alunoSelecionado.rotaVoltaId !==
+                        alunoSelecionado.rotaIdaId
+                        ? "Trajeto Ida"
+                        : "Ver Trajeto"}
+                    </Button>
+                  ) : null}
+                  {alunoSelecionado.rotaVoltaId &&
+                  alunoSelecionado.rotaVoltaId !==
+                    alunoSelecionado.rotaIdaId ? (
+                    <Button
+                      mode="outlined"
+                      compact
+                      icon="map-marker-path"
+                      style={styles.rotaShortcutBtn}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/(tabs)/rotas/trajeto",
+                          params: { id: alunoSelecionado.rotaVoltaId },
+                        })
+                      }
+                    >
+                      Trajeto Volta
+                    </Button>
+                  ) : null}
+                </View>
+              ) : null}
             </Surface>
 
             {/* Navegação entre as 3 frentes operacionais */}
@@ -213,6 +256,7 @@ export default function OperacaoScreen() {
             {aba === "avisos" && (
               <AvisosTab
                 alunoId={alunoSelecionado.id}
+                alunoNome={alunoSelecionado.nome}
                 isResponsavel={isResponsavel}
                 onConfirmDelete={setConfirmDialog}
               />
@@ -290,6 +334,15 @@ const styles = StyleSheet.create({
   escolaText: {
     color: colors.textSecondary,
     marginTop: 8,
+  },
+  rotasShortcutRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 10,
+  },
+  rotaShortcutBtn: {
+    borderRadius: 8,
   },
   tabs: {
     marginBottom: 14,

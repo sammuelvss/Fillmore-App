@@ -26,6 +26,7 @@ export default function RotaCard({
   onEdit,
   onDelete,
   onViewAlunos,
+  onViewTrajeto,
 }) {
   const isManha = rota.turno === "MANHA";
 
@@ -218,6 +219,20 @@ export default function RotaCard({
 
         {/* Rodapé de Ações */}
         <View style={styles.footerRow}>
+          {onViewTrajeto ? (
+            <Button
+              mode="contained"
+              icon="map-marker-path"
+              compact
+              style={styles.footerBtn}
+              buttonColor={colors.secondary}
+              textColor="#FFFFFF"
+              onPress={() => onViewTrajeto(rota)}
+            >
+              Rota do Dia
+            </Button>
+          ) : null}
+
           <Button
             mode="outlined"
             icon="account-group-outline"
@@ -364,8 +379,9 @@ const styles = StyleSheet.create({
   },
   footerRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "flex-end",
-    gap: 10,
+    gap: 8,
   },
   footerBtn: {
     borderRadius: 8,

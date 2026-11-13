@@ -24,8 +24,13 @@ export const logoutRequest = async () => {
   return true;
 };
 
-export const getSessionRequest = async () => {
-  const response = await apiClient.get("/session");
+export const getSessionRequest = async (tokenOverride) => {
+  const response = await apiClient.get(
+    "/session",
+    tokenOverride
+      ? { headers: { Authorization: `Bearer ${tokenOverride}` } }
+      : undefined,
+  );
   return response.data;
 };
 

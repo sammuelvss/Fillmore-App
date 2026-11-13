@@ -98,6 +98,7 @@ export default function ViagensTab({ alunoId, onConfirmDelete }) {
           placeholder="Ex.: Consulta médica"
           value={motivo}
           onChangeText={setMotivo}
+          maxLength={180}
           style={styles.input}
         />
 
