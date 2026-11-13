@@ -120,6 +120,14 @@ export default function RotasListScreen() {
     router.push("/(tabs)/alunos");
   };
 
+  const handleViewTrajeto = (rota) => {
+    setRotaAtiva(rota);
+    router.push({
+      pathname: "/(tabs)/rotas/trajeto",
+      params: { id: rota.id },
+    });
+  };
+
   const handleConfirmDelete = async () => {
     if (!rotaParaExcluir) return;
     try {
@@ -222,6 +230,7 @@ export default function RotasListScreen() {
               onEdit={handleOpenEdit}
               onDelete={(rota) => setRotaParaExcluir(rota)}
               onViewAlunos={handleViewAlunosDaRota}
+              onViewTrajeto={handleViewTrajeto}
             />
           )}
           ListEmptyComponent={
