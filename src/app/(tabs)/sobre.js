@@ -44,7 +44,7 @@ export default function SobreScreen() {
     {
       ordem: "3º",
       nome: "Joao",
-      ra: "RA: [Preencher RA de Joao]",
+      ra: "RA: 00000859881",
       papel: "CRUD de Alunos (Guarda Compartilhada) & Relacionamento 1: Rota ↔ Alunos com Lotação",
       endpoints: "CRUD /alunos, GET/POST/DELETE /rotas/:rotaId/alunos",
       icon: "account-group",
