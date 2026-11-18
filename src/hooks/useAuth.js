@@ -21,8 +21,8 @@ export const useLoginMutation = () => {
 
   return useMutation({
     mutationFn: loginRequest,
-    onSuccess: ({ user, token }) => {
-      setAuth(user, token);
+    onSuccess: ({ user, token, refreshToken }) => {
+      setAuth(user, token, refreshToken);
       showSnackbar(`Bem-vindo(a), ${user?.nome || "usuário"}!`, "success");
     },
     onError: (e) =>
