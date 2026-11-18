@@ -15,16 +15,26 @@ export const useAuthStore = create(
     (set, get) => ({
       user: null,
       token: null,
+      refreshToken: null,
       isHydrated: false,
 
       /**
-       * Salva o usuário e o token JWT após login ou Quick Token Dev
+       * Salva o usuário, o access token e o refresh token após login
        */
-      setAuth: (user, token) =>
+      setAuth: (user, token, refreshToken = null) =>
         set({
           user,
           token,
+          refreshToken,
         }),
+
+      // Atualiza os tokens após rotação em POST /session/refresh
+      setTokens: ({ token, refreshToken, user }) =>
+        set((state) => ({
+          token,
+          refreshToken: refreshToken ?? state.refreshToken,
+          user: user ?? state.user,
+        })),
 
       /**
        * Atualiza apenas os dados do usuário no estado (ex.: após PUT /users/:userId pelo Samuel)
@@ -41,6 +51,7 @@ export const useAuthStore = create(
         set({
           user: null,
           token: null,
+          refreshToken: null,
         }),
 
       setHydrated: (hydrated) => set({ isHydrated: hydrated }),

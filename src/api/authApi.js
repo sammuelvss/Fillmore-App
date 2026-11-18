@@ -1,26 +1,31 @@
 import apiClient from "./client";
+import { useAuthStore } from "../store/useAuthStore";
 
 /**
  * ============================================================================
  * MÓDULO DE API: AUTENTICAÇÃO E PERFIL (Responsável: SAMUEL — 2º a atuar)
  * ============================================================================
  * Endpoints do Back-end Express 5:
- * - POST   /session       -> Login (retorna { user, token }) — Rate Limit: 5 req / 15 min
- * - DELETE /session       -> Logout (revoga o token na tabela TokenRevogado - HTTP 204)
- * - GET    /session       -> Retorna dados da sessão atual (req.user)
- * - POST   /users         -> Sign Up (cria Usuario + Motorista ou Responsavel em transação)
- * - GET    /users/:userId -> Obtém perfil completo do usuário logado
- * - PUT    /users/:userId -> Atualiza nome, telefone, senha e dados de Motorista (CNH, placa, capacidadeVan, chavePix, titularPix)
- * - DELETE /users/:userId -> Exclui a conta do usuário
+ * - POST   /session         -> Login (retorna { user, token, refreshToken }) — Rate Limit: 5 req / 15 min
+ * - POST   /session/refresh -> Rotaciona o refresh token (retorna { user, token, refreshToken })
+ * - DELETE /session         -> Logout (revoga access token e a família do refresh token - HTTP 204)
+ * - GET    /session         -> Retorna dados da sessão atual (req.user)
+ * - POST   /users           -> Sign Up (cria Usuario + Motorista ou Responsavel em transação)
+ * - GET    /users/:userId   -> Obtém perfil completo do usuário logado
+ * - PUT    /users/:userId   -> Atualiza nome, telefone, senha e dados de Motorista (CNH, placa, capacidadeVan, chavePix, titularPix)
+ * - DELETE /users/:userId   -> Exclui a conta do usuário
  */
 
 export const loginRequest = async ({ email, senha }) => {
   const response = await apiClient.post("/session", { email, senha });
-  return response.data; // { user, token }
+  return response.data; // { user, token, refreshToken }
 };
 
 export const logoutRequest = async () => {
-  await apiClient.delete("/session");
+  const { refreshToken } = useAuthStore.getState();
+  await apiClient.delete("/session", {
+    data: refreshToken ? { refreshToken } : undefined,
+  });
   return true;
 };
 
