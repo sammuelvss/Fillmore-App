@@ -82,6 +82,14 @@ export const getAlunosDoResponsavel = async (responsavelId) => {
   return response.data;
 };
 
+// --- AUXILIAR: LISTA DE RESPONSÁVEIS PARA SELEÇÃO NO FORMULÁRIO ---
+
+export const getResponsaveis = async () => {
+  const response = await apiClient.get("/users");
+  const lista = Array.isArray(response.data) ? response.data : [];
+  return lista.filter((u) => u.tipo === "RESPONSAVEL" && u.responsavel?.id);
+};
+
 export default {
   getAlunos,
   getAlunoById,
@@ -92,4 +100,5 @@ export default {
   vincularAlunoNaRota,
   desvincularAlunoDaRota,
   getAlunosDoResponsavel,
+  getResponsaveis,
 };

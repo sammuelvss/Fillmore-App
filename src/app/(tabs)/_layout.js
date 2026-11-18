@@ -64,10 +64,10 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
-        name="alunos/index"
+        name="alunos"
         options={{
           title: "Alunos",
-          headerTitle: "Alunos & Lotação",
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
               name="account-group-outline"
