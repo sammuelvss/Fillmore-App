@@ -109,19 +109,23 @@ export default function HomeScreen() {
   };
 
   const shortcuts = [
+    ...(isMotorista
+      ? [
+          {
+            title: "Rotas Escolares",
+            subtitle: "Criar, editar e acompanhar trajetos do dia",
+            icon: "map-marker-path",
+            color: "#F59E0B",
+            bg: "#FEF3C7",
+            route: "/(tabs)/rotas",
+          },
+        ]
+      : []),
     {
-      title: "Rotas Escolares",
-      subtitle: "Criar, editar e gerenciar trajetos",
-      owner: "Sammuel",
-      icon: "map-marker-path",
-      color: "#F59E0B",
-      bg: "#FEF3C7",
-      route: "/(tabs)/rotas",
-    },
-    {
-      title: "Alunos & Lotação",
-      subtitle: "Cadastro e vínculo com a van",
-      owner: "Joao",
+      title: isMotorista ? "Alunos & Lotação" : "Meus Filhos",
+      subtitle: isMotorista
+        ? "Cadastro e vínculo com a van"
+        : "Dados escolares e endereços de embarque",
       icon: "account-group",
       color: "#2563EB",
       bg: "#DBEAFE",
@@ -129,8 +133,9 @@ export default function HomeScreen() {
     },
     {
       title: "Mensalidades & Pix",
-      subtitle: "Faturas, status e cobrança 1-click",
-      owner: "Paulo",
+      subtitle: isMotorista
+        ? "Faturas, status e cobrança em 1 clique"
+        : "Pendências e chave Pix do motorista",
       icon: "cash-check",
       color: "#059669",
       bg: "#D1FAE5",
@@ -138,8 +143,7 @@ export default function HomeScreen() {
     },
     {
       title: "Operação Diária",
-      subtitle: "Presença, faltas e avisos da rota",
-      owner: "Edmundo",
+      subtitle: "Presença, cancelamentos e avisos da rota",
       icon: "clipboard-check",
       color: "#7C3AED",
       bg: "#EDE9FE",
@@ -211,152 +215,158 @@ export default function HomeScreen() {
           </Button>
         </View>
 
-        <Divider style={styles.heroDivider} />
-
-        <View style={styles.vanMetaRow}>
-          <View style={styles.vanMetaItem}>
-            <MaterialCommunityIcons
-              name="seat-passenger"
-              size={18}
-              color={colors.primaryAccent}
-            />
-            <Text variant="labelMedium" style={styles.vanMetaText}>
-              Capacidade: {user?.motorista?.capacidadeVan || 15} lugares
-            </Text>
-          </View>
-
-          <View style={styles.vanMetaItem}>
-            <MaterialCommunityIcons
-              name="qrcode"
-              size={18}
-              color={colors.primaryAccent}
-            />
-            <Text variant="labelMedium" style={styles.vanMetaText}>
-              Pix: {user?.motorista?.chavePix || "Configurar no Perfil"}
-            </Text>
-          </View>
-        </View>
-      </Surface>
-
-      {/* Filtro Global de Turno (Zustand `useAppStore`) */}
-      <Surface style={styles.filterSection} elevation={1}>
-        <View style={styles.filterHeader}>
-          <MaterialCommunityIcons
-            name="clock-time-four-outline"
-            size={20}
-            color={colors.secondary}
-          />
-          <Text variant="titleSmall" style={styles.filterTitle}>
-            Filtro Global de Turno (Zustand Store)
-          </Text>
-        </View>
-        <SegmentedButtons
-          value={turnoFiltro}
-          onValueChange={setTurnoFiltro}
-          buttons={[
-            {
-              value: "TODOS",
-              label: `Todos (${stats.totalGeral})`,
-              icon: "view-grid-outline",
-            },
-            {
-              value: "MANHA",
-              label: `Manhã (${stats.rotasManha})`,
-              icon: "weather-sunny",
-            },
-            {
-              value: "TARDE",
-              label: `Tarde (${stats.rotasTarde})`,
-              icon: "weather-sunset",
-            },
-          ]}
-        />
-      </Surface>
-
-      {/* KPIs Operacionais das Rotas */}
-      <View style={styles.sectionHeaderRow}>
-        <Text variant="titleMedium" style={styles.sectionTitle}>
-          Resumo de Rotas ({turnoFiltro})
-        </Text>
         {isMotorista ? (
-          <Button
-            mode="text"
-            compact
-            icon="plus-circle-outline"
-            textColor={colors.primaryDark}
-            onPress={() => router.push("/(tabs)/rotas/form")}
-          >
-            Nova Rota
-          </Button>
+          <>
+            <Divider style={styles.heroDivider} />
+
+            <View style={styles.vanMetaRow}>
+              <View style={styles.vanMetaItem}>
+                <MaterialCommunityIcons
+                  name="seat-passenger"
+                  size={18}
+                  color={colors.primaryAccent}
+                />
+                <Text variant="labelMedium" style={styles.vanMetaText}>
+                  Capacidade: {user?.motorista?.capacidadeVan || 15} lugares
+                </Text>
+              </View>
+
+              <View style={styles.vanMetaItem}>
+                <MaterialCommunityIcons
+                  name="qrcode"
+                  size={18}
+                  color={colors.primaryAccent}
+                />
+                <Text variant="labelMedium" style={styles.vanMetaText}>
+                  Pix: {user?.motorista?.chavePix || "Configurar no Perfil"}
+                </Text>
+              </View>
+            </View>
+          </>
         ) : null}
-      </View>
+      </Surface>
 
-      {isLoading ? (
-        <Surface style={styles.loadingCard} elevation={1}>
-          <ActivityIndicator color={colors.primary} />
-          <Text variant="bodySmall" style={styles.loadingLabel}>
-            Sincronizando rotas com a API ({API_BASE_URL})...
-          </Text>
-        </Surface>
-      ) : (
-        <View style={styles.kpiGrid}>
-          <Surface style={styles.kpiCard} elevation={1}>
-            <MaterialCommunityIcons
-              name="routes"
-              size={26}
-              color={colors.primaryDark}
+      {isMotorista ? (
+        <>
+          {/* Filtro Global de Turno */}
+          <Surface style={styles.filterSection} elevation={1}>
+            <View style={styles.filterHeader}>
+              <MaterialCommunityIcons
+                name="clock-time-four-outline"
+                size={20}
+                color={colors.secondary}
+              />
+              <Text variant="titleSmall" style={styles.filterTitle}>
+                Filtro de Turno
+              </Text>
+            </View>
+            <SegmentedButtons
+              value={turnoFiltro}
+              onValueChange={setTurnoFiltro}
+              buttons={[
+                {
+                  value: "TODOS",
+                  label: `Todos (${stats.totalGeral})`,
+                  icon: "view-grid-outline",
+                },
+                {
+                  value: "MANHA",
+                  label: `Manhã (${stats.rotasManha})`,
+                  icon: "weather-sunny",
+                },
+                {
+                  value: "TARDE",
+                  label: `Tarde (${stats.rotasTarde})`,
+                  icon: "weather-sunset",
+                },
+              ]}
             />
-            <Text variant="headlineSmall" style={styles.kpiValue}>
-              {stats.totalFiltrado}
-            </Text>
-            <Text variant="labelSmall" style={styles.kpiLabel}>
-              Rotas no Turno
-            </Text>
           </Surface>
 
-          <Surface style={styles.kpiCard} elevation={1}>
-            <MaterialCommunityIcons
-              name="map-marker-distance"
-              size={26}
-              color="#2563EB"
-            />
-            <Text variant="headlineSmall" style={styles.kpiValue}>
-              {stats.kmTotal} km
+          {/* KPIs Operacionais das Rotas */}
+          <View style={styles.sectionHeaderRow}>
+            <Text variant="titleMedium" style={styles.sectionTitle}>
+              Resumo de Rotas ({turnoFiltro})
             </Text>
-            <Text variant="labelSmall" style={styles.kpiLabel}>
-              Distância Somada
-            </Text>
-          </Surface>
+            <Button
+              mode="text"
+              compact
+              icon="plus-circle-outline"
+              textColor={colors.primaryDark}
+              onPress={() => router.push("/(tabs)/rotas/form")}
+            >
+              Nova Rota
+            </Button>
+          </View>
 
-          <Surface style={styles.kpiCard} elevation={1}>
-            <MaterialCommunityIcons
-              name="timer-outline"
-              size={26}
-              color="#059669"
-            />
-            <Text variant="headlineSmall" style={styles.kpiValue}>
-              {stats.minTotal} min
-            </Text>
-            <Text variant="labelSmall" style={styles.kpiLabel}>
-              Tempo Estimado
-            </Text>
-          </Surface>
+          {isLoading ? (
+            <Surface style={styles.loadingCard} elevation={1}>
+              <ActivityIndicator color={colors.primary} />
+              <Text variant="bodySmall" style={styles.loadingLabel}>
+                Sincronizando rotas com a API...
+              </Text>
+            </Surface>
+          ) : (
+            <View style={styles.kpiGrid}>
+              <Surface style={styles.kpiCard} elevation={1}>
+                <MaterialCommunityIcons
+                  name="routes"
+                  size={26}
+                  color={colors.primaryDark}
+                />
+                <Text variant="headlineSmall" style={styles.kpiValue}>
+                  {stats.totalFiltrado}
+                </Text>
+                <Text variant="labelSmall" style={styles.kpiLabel}>
+                  Rotas no Turno
+                </Text>
+              </Surface>
 
-          <Surface style={styles.kpiCard} elevation={1}>
-            <MaterialCommunityIcons
-              name="account-check-outline"
-              size={26}
-              color="#7C3AED"
-            />
-            <Text variant="headlineSmall" style={styles.kpiValue}>
-              {stats.alunosAlocados}
-            </Text>
-            <Text variant="labelSmall" style={styles.kpiLabel}>
-              Alunos Vinculados
-            </Text>
-          </Surface>
-        </View>
-      )}
+              <Surface style={styles.kpiCard} elevation={1}>
+                <MaterialCommunityIcons
+                  name="map-marker-distance"
+                  size={26}
+                  color="#2563EB"
+                />
+                <Text variant="headlineSmall" style={styles.kpiValue}>
+                  {stats.kmTotal} km
+                </Text>
+                <Text variant="labelSmall" style={styles.kpiLabel}>
+                  Distância Somada
+                </Text>
+              </Surface>
+
+              <Surface style={styles.kpiCard} elevation={1}>
+                <MaterialCommunityIcons
+                  name="timer-outline"
+                  size={26}
+                  color="#059669"
+                />
+                <Text variant="headlineSmall" style={styles.kpiValue}>
+                  {stats.minTotal} min
+                </Text>
+                <Text variant="labelSmall" style={styles.kpiLabel}>
+                  Tempo Estimado
+                </Text>
+              </Surface>
+
+              <Surface style={styles.kpiCard} elevation={1}>
+                <MaterialCommunityIcons
+                  name="account-check-outline"
+                  size={26}
+                  color="#7C3AED"
+                />
+                <Text variant="headlineSmall" style={styles.kpiValue}>
+                  {stats.alunosAlocados}
+                </Text>
+                <Text variant="labelSmall" style={styles.kpiLabel}>
+                  Alunos Vinculados
+                </Text>
+              </Surface>
+            </View>
+          )}
+        </>
+      ) : null}
 
       {/* Prévia rápida das rotas cadastradas */}
       {stats.recentes.length > 0 && (
@@ -415,9 +425,9 @@ export default function HomeScreen() {
         </Surface>
       )}
 
-      {/* Atalhos para os Módulos dos 5 Integrantes */}
+      {/* Atalhos rápidos */}
       <Text variant="titleMedium" style={styles.sectionTitle}>
-        Módulos do Sistema (4 Pilares Fillmore)
+        Acesso Rápido
       </Text>
       <View style={styles.shortcutsGrid}>
         {shortcuts.map((item) => (
@@ -442,9 +452,6 @@ export default function HomeScreen() {
                   <Text variant="titleSmall" style={styles.shortcutTitle}>
                     {item.title}
                   </Text>
-                  <Chip compact style={styles.ownerChip} textStyle={styles.ownerChipText}>
-                    {item.owner}
-                  </Chip>
                 </View>
                 <Text variant="bodySmall" style={styles.shortcutSubtitle}>
                   {item.subtitle}

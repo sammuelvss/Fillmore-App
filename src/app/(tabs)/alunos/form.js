@@ -87,7 +87,6 @@ export default function AlunoFormScreen() {
   const [telefoneContatoEntrega, setTelefoneContatoEntrega] = useState("");
   const [diaVencimento, setDiaVencimento] = useState("");
 
-  const [mostrarManualUuid, setMostrarManualUuid] = useState(false);
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
@@ -171,9 +170,7 @@ export default function AlunoFormScreen() {
       return setFormError("O nome da escola é obrigatório.");
     }
     if (!responsavelId.trim()) {
-      return setFormError(
-        "Selecione um responsável legal ou informe o UUID do responsável.",
-      );
+      return setFormError("Selecione um responsável legal para o aluno.");
     }
 
     let diaVencParsed = null;
@@ -391,35 +388,9 @@ export default function AlunoFormScreen() {
                 </>
               ) : (
                 <Text variant="bodySmall" style={styles.helperCopy}>
-                  Nenhum usuário com perfil RESPONSAVEL encontrado. Informe o
-                  UUID manualmente abaixo.
+                  Nenhum responsável cadastrado ainda. Peça ao responsável para
+                  criar uma conta no aplicativo antes de vincular o aluno.
                 </Text>
-              )}
-
-              <Button
-                mode="text"
-                compact
-                icon={mostrarManualUuid ? "chevron-up" : "identifier"}
-                onPress={() => setMostrarManualUuid(!mostrarManualUuid)}
-                style={styles.toggleLink}
-              >
-                {mostrarManualUuid
-                  ? "Ocultar campo manual de UUID"
-                  : "Informar UUID do Responsável manualmente"}
-              </Button>
-
-              {(mostrarManualUuid || responsaveis.length === 0) && (
-                <TextInput
-                  label="ID do Responsável (UUID) *"
-                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                  mode="outlined"
-                  autoCapitalize="none"
-                  value={responsavelId}
-                  onChangeText={setResponsavelId}
-                  left={<TextInput.Icon icon="key-outline" />}
-                  style={styles.input}
-                  dense
-                />
               )}
             </>
           )}

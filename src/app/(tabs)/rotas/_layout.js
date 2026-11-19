@@ -1,8 +1,26 @@
 import React from "react";
-import { Stack } from "expo-router";
+import { TouchableOpacity } from "react-native";
+import { Stack, useRouter } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { colors } from "../../../theme";
 
 export default function RotasStackLayout() {
+  const router = useRouter();
+
+  const renderPerfilButton = () => (
+    <TouchableOpacity
+      onPress={() => router.push("/(tabs)/perfil")}
+      style={{ marginRight: 6, padding: 4 }}
+      accessibilityLabel="Abrir Meu Perfil"
+    >
+      <MaterialCommunityIcons
+        name="account-circle-outline"
+        size={26}
+        color="#FFFFFF"
+      />
+    </TouchableOpacity>
+  );
+
   return (
     <Stack
       screenOptions={{
@@ -16,6 +34,7 @@ export default function RotasStackLayout() {
         name="index"
         options={{
           title: "Rotas Escolares",
+          headerRight: renderPerfilButton,
         }}
       />
       <Stack.Screen
