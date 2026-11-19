@@ -27,6 +27,7 @@ import { colors } from "../../../theme";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { useAppStore } from "../../../store/useAppStore";
 import { useAlunosQuery } from "../../../hooks/useAlunos";
+import { useRotasQuery } from "../../../hooks/useRotas";
 import {
   useMensalidadesQuery,
   usePendenciasResponsavelQuery,
@@ -111,28 +112,94 @@ export default function FinanceiroScreen() {
 
   const isMotorista = user?.tipo === "MOTORISTA" || !user?.tipo;
   const isResponsavel = user?.tipo === "RESPONSAVEL";
+  const motoristaId = user?.motorista?.id;
   const responsavelId =
     user?.responsavel?.id || (isResponsavel ? user?.id : null);
 
   const {
     data: alunosRaw,
-    isLoading: loadingAlunos,
+    isLoading: loadingAlunosRaw,
     refetch: refetchAlunos,
   } = useAlunosQuery();
 
-  const alunos = useMemo(() => {
+  const {
+    data: rotasRaw,
+    isLoading: loadingRotas,
+    refetch: refetchRotas,
+  } = useRotasQuery({ enabled: isMotorista });
+
+  const todosAlunos = useMemo(() => {
     if (Array.isArray(alunosRaw)) return alunosRaw;
     return alunosRaw?.alunos || alunosRaw?.data || [];
   }, [alunosRaw]);
 
+  const minhasRotas = useMemo(() => {
+    const lista = Array.isArray(rotasRaw)
+      ? rotasRaw
+      : rotasRaw?.rotas || rotasRaw?.data || [];
+    if (!motoristaId) return lista;
+    return lista.filter(
+      (r) => !r.motoristaId || String(r.motoristaId) === String(motoristaId)
+    );
+  }, [rotasRaw, motoristaId]);
+
+  // Filtra apenas alunos vinculados às rotas do motorista logado (evita 403 Forbidden)
+  const alunos = useMemo(() => {
+    if (!isMotorista) return todosAlunos;
+
+    const minhasRotasIds = new Set(minhasRotas.map((r) => String(r.id)));
+    const alunosIdsDasMinhasRotas = new Set();
+
+    minhasRotas.forEach((rota) => {
+      const vinculados = [
+        ...(Array.isArray(rota.alunosIda) ? rota.alunosIda : []),
+        ...(Array.isArray(rota.alunosVolta) ? rota.alunosVolta : []),
+        ...(Array.isArray(rota.alunos) ? rota.alunos : []),
+      ];
+      vinculados.forEach((a) => {
+        if (a?.id) alunosIdsDasMinhasRotas.add(String(a.id));
+      });
+    });
+
+    return todosAlunos.filter((aluno) => {
+      if (alunosIdsDasMinhasRotas.has(String(aluno.id))) return true;
+
+      const rotaIdaId = aluno.rotaIdaId ?? aluno.rotaIda?.id;
+      const rotaVoltaId = aluno.rotaVoltaId ?? aluno.rotaVolta?.id;
+
+      if (rotaIdaId && minhasRotasIds.has(String(rotaIdaId))) return true;
+      if (rotaVoltaId && minhasRotasIds.has(String(rotaVoltaId))) return true;
+
+      if (motoristaId) {
+        const motIda =
+          aluno.rotaIda?.motoristaId ?? aluno.rotaIda?.motorista?.id;
+        const motVolta =
+          aluno.rotaVolta?.motoristaId ?? aluno.rotaVolta?.motorista?.id;
+
+        if (motIda && String(motIda) === String(motoristaId)) return true;
+        if (motVolta && String(motVolta) === String(motoristaId)) return true;
+      }
+
+      return false;
+    });
+  }, [isMotorista, todosAlunos, minhasRotas, motoristaId]);
+
+  const loadingAlunos = loadingAlunosRaw || (isMotorista && loadingRotas);
+
   useEffect(() => {
+    if (loadingAlunos) return;
+
     if (alunos.length > 0) {
-      const aindaExiste = alunos.some((a) => a.id === alunoAtivo?.id);
+      const aindaExiste = alunos.some(
+        (a) => String(a.id) === String(alunoAtivo?.id)
+      );
       if (!alunoAtivo || !aindaExiste) {
         setAlunoAtivo(alunos[0]);
       }
+    } else if (alunoAtivo) {
+      setAlunoAtivo(null);
     }
-  }, [alunos, alunoAtivo, setAlunoAtivo]);
+  }, [alunos, alunoAtivo, loadingAlunos, setAlunoAtivo]);
 
   const {
     data: mensalidades = [],
@@ -182,6 +249,7 @@ export default function FinanceiroScreen() {
 
   const handleRefresh = () => {
     refetchAlunos();
+    if (isMotorista) refetchRotas();
     if (alunoAtivo?.id) refetchMensalidades();
     if (isResponsavel && responsavelId) refetchPendencias();
   };
@@ -320,8 +388,7 @@ export default function FinanceiroScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Banner de erro de conexão (mesmo padrão da tela de Alunos) */}
-      {isErrorMensalidades ? (
+      {isErrorMensalidades && alunoAtivo ? (
         <Banner
           visible
           icon="cloud-alert"
@@ -428,7 +495,7 @@ export default function FinanceiroScreen() {
           </Button>
         </Surface>
 
-        {/* Seletor de Aluno (Chips alinhados ao filtro da tela de Alunos) */}
+        {/* Seletor de Aluno (Somente alunos vinculados às rotas do motorista) */}
         <Surface style={styles.selectorBox} elevation={1}>
           <View style={styles.selectorHeader}>
             <MaterialCommunityIcons
@@ -437,7 +504,7 @@ export default function FinanceiroScreen() {
               color={colors.secondary}
             />
             <Text variant="titleSmall" style={styles.selectorTitle}>
-              Aluno Selecionado (Zustand Store)
+              Aluno Selecionado ({alunos.length})
             </Text>
           </View>
 
@@ -448,8 +515,9 @@ export default function FinanceiroScreen() {
             />
           ) : alunos.length === 0 ? (
             <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
-              Nenhum aluno cadastrado ainda. Cadastre um aluno na aba Alunos
-              para gerenciar mensalidades.
+              {isMotorista
+                ? "Nenhum aluno vinculado às suas rotas. Vincule um aluno na aba Alunos para gerenciar mensalidades."
+                : "Nenhum aluno vinculado ao seu perfil de responsável."}
             </Text>
           ) : (
             <ScrollView
@@ -458,7 +526,8 @@ export default function FinanceiroScreen() {
               contentContainerStyle={styles.alunosChipsRow}
             >
               {alunos.map((aluno) => {
-                const selecionado = alunoAtivo?.id === aluno.id;
+                const selecionado =
+                  String(alunoAtivo?.id) === String(aluno.id);
                 return (
                   <Chip
                     key={aluno.id}
@@ -494,8 +563,8 @@ export default function FinanceiroScreen() {
           </View>
         ) : null}
 
-        {/* Listagem de Mensalidades ou EmptyState padrão do projeto */}
-        {loadingMensalidades ? (
+        {/* Listagem de Mensalidades ou EmptyState */}
+        {loadingAlunos || loadingMensalidades ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color={colors.primary} />
             <Text variant="bodyMedium" style={styles.loadingText}>
@@ -505,8 +574,12 @@ export default function FinanceiroScreen() {
         ) : !alunoAtivo ? (
           <EmptyState
             icon="account-school-outline"
-            title="Nenhum aluno disponível"
-            description="Cadastre um aluno na aba Alunos para lançar e acompanhar mensalidades."
+            title="Nenhum aluno vinculado às suas rotas"
+            description={
+              isMotorista
+                ? "Vá até a aba Alunos, vincule um aluno a uma das suas rotas e volte aqui para lançar mensalidades."
+                : "Nenhum aluno foi encontrado no seu cadastro de responsável."
+            }
           />
         ) : mensalidades.length === 0 ? (
           <EmptyState
@@ -642,7 +715,7 @@ export default function FinanceiroScreen() {
         )}
       </ScrollView>
 
-      {/* Botão Flutuante (FAB) no mesmo padrão da aba Alunos */}
+      {/* Botão Flutuante (FAB) */}
       {isMotorista && alunoAtivo ? (
         <FAB
           icon="cash-plus"
@@ -667,7 +740,11 @@ export default function FinanceiroScreen() {
           <Dialog.Content>
             <Text
               variant="bodySmall"
-              style={{ marginBottom: 12, textAlign: "center", color: colors.text }}
+              style={{
+                marginBottom: 12,
+                textAlign: "center",
+                color: colors.text,
+              }}
             >
               Aluno:{" "}
               <Text style={styles.boldText}>{alunoAtivo?.nome}</Text>
