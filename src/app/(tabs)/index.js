@@ -18,6 +18,7 @@ import {
 } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { colors } from "../../theme";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useAppStore } from "../../store/useAppStore";
@@ -38,6 +39,7 @@ import { API_BASE_URL } from "../../api/client";
  */
 export default function HomeScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const clearAuth = useAuthStore((state) => state.clearAuth);
 
@@ -100,9 +102,9 @@ export default function HomeScreen() {
       // Mesmo se o token for de preview ou a rede falhar, garantimos a limpeza local
     } finally {
       clearAuth();
+      queryClient.clear();
       setLoggingOut(false);
       showSnackbar("Sessão encerrada com segurança.", "info");
-      router.replace("/(auth)/login");
     }
   };
 
@@ -276,15 +278,17 @@ export default function HomeScreen() {
         <Text variant="titleMedium" style={styles.sectionTitle}>
           Resumo de Rotas ({turnoFiltro})
         </Text>
-        <Button
-          mode="text"
-          compact
-          icon="plus-circle-outline"
-          textColor={colors.primaryDark}
-          onPress={() => router.push("/(tabs)/rotas/form")}
-        >
-          Nova Rota
-        </Button>
+        {isMotorista ? (
+          <Button
+            mode="text"
+            compact
+            icon="plus-circle-outline"
+            textColor={colors.primaryDark}
+            onPress={() => router.push("/(tabs)/rotas/form")}
+          >
+            Nova Rota
+          </Button>
+        ) : null}
       </View>
 
       {isLoading ? (
