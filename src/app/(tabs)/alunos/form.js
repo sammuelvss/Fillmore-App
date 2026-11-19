@@ -28,13 +28,7 @@ import {
   useResponsaveisQuery,
   useUpdateAlunoMutation,
 } from "../../../hooks/useAlunos";
-
-const RECIFE_PRESETS = [
-  { label: "Boa Viagem", lat: "-8.1189", lng: "-34.8988" },
-  { label: "Derby", lat: "-8.0567", lng: "-34.8999" },
-  { label: "Casa Forte", lat: "-8.0342", lng: "-34.9226" },
-  { label: "Espinheiro", lat: "-8.0439", lng: "-34.8939" },
-];
+import { geocodificarEndereco } from "../../../utils/geocoding";
 
 /**
  * ============================================================================
@@ -43,7 +37,7 @@ const RECIFE_PRESETS = [
  * Contempla:
  * - Identificação (`nome`, `escola`, `modalidade`, `diaVencimentoMensalidade`)
  * - Vínculo de `responsavelId` (automático se RESPONSAVEL; lista de responsáveis ou UUID se MOTORISTA)
- * - Guarda Compartilhada: `enderecoEmbarque` e `enderecoDesembarque` independentes (+ GPS opcional)
+ * - Guarda Compartilhada: `enderecoEmbarque` e `enderecoDesembarque` independentes (geocodificação automática)
  * - Contato de entrega (`nomeContatoEntrega`, `telefoneContatoEntrega`)
  */
 export default function AlunoFormScreen() {
@@ -69,7 +63,9 @@ export default function AlunoFormScreen() {
 
   const createMutation = useCreateAlunoMutation();
   const updateMutation = useUpdateAlunoMutation();
-  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+  const [geocodificando, setGeocodificando] = useState(false);
+  const isSubmitting =
+    geocodificando || createMutation.isPending || updateMutation.isPending;
 
   const [nome, setNome] = useState("");
   const [escola, setEscola] = useState("");
@@ -92,7 +88,6 @@ export default function AlunoFormScreen() {
   const [diaVencimento, setDiaVencimento] = useState("");
 
   const [mostrarManualUuid, setMostrarManualUuid] = useState(false);
-  const [mostrarGps, setMostrarGps] = useState(false);
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
@@ -142,13 +137,6 @@ export default function AlunoFormScreen() {
         : "",
     );
 
-    if (
-      alunoDetalhe.latitudeEmbarque != null ||
-      alunoDetalhe.latitudeDesembarque != null
-    ) {
-      setMostrarGps(true);
-    }
-
     setNomeContatoEntrega(alunoDetalhe.nomeContatoEntrega || "");
     setTelefoneContatoEntrega(alunoDetalhe.telefoneContatoEntrega || "");
     setDiaVencimento(
@@ -162,20 +150,6 @@ export default function AlunoFormScreen() {
     if (val === "" || val === null || val === undefined) return null;
     const parsed = Number.parseFloat(String(val).replace(",", ".").trim());
     return Number.isNaN(parsed) ? NaN : parsed;
-  };
-
-  const applyPreset = (target, preset) => {
-    if (target === "embarque") {
-      setLatitudeEmbarque(preset.lat);
-      setLongitudeEmbarque(preset.lng);
-      if (mesmoEndereco) {
-        setLatitudeDesembarque(preset.lat);
-        setLongitudeDesembarque(preset.lng);
-      }
-    } else {
-      setLatitudeDesembarque(preset.lat);
-      setLongitudeDesembarque(preset.lng);
-    }
   };
 
   const handleToggleMesmoEndereco = (value) => {
@@ -212,30 +186,42 @@ export default function AlunoFormScreen() {
       }
     }
 
-    const latEmb = parseOptionalFloat(latitudeEmbarque);
-    const lngEmb = parseOptionalFloat(longitudeEmbarque);
-    const latDes = parseOptionalFloat(
-      mesmoEndereco ? latitudeEmbarque : latitudeDesembarque,
-    );
-    const lngDes = parseOptionalFloat(
-      mesmoEndereco ? longitudeEmbarque : longitudeDesembarque,
-    );
-
-    if (
-      Number.isNaN(latEmb) ||
-      Number.isNaN(lngEmb) ||
-      Number.isNaN(latDes) ||
-      Number.isNaN(lngDes)
-    ) {
-      return setFormError(
-        "As coordenadas de latitude/longitude informadas devem ser números válidos.",
-      );
-    }
-
     const endEmbFinal = enderecoEmbarque.trim() || null;
     const endDesFinal = mesmoEndereco
       ? endEmbFinal
       : enderecoDesembarque.trim() || null;
+
+    let latEmb = endEmbFinal ? parseOptionalFloat(latitudeEmbarque) : null;
+    let lngEmb = endEmbFinal ? parseOptionalFloat(longitudeEmbarque) : null;
+    let latDes = endDesFinal
+      ? parseOptionalFloat(mesmoEndereco ? latitudeEmbarque : latitudeDesembarque)
+      : null;
+    let lngDes = endDesFinal
+      ? parseOptionalFloat(mesmoEndereco ? longitudeEmbarque : longitudeDesembarque)
+      : null;
+
+    const embMudou = !isEditMode || endEmbFinal !== (alunoDetalhe?.enderecoEmbarque || null);
+    const desMudou = !isEditMode || endDesFinal !== (alunoDetalhe?.enderecoDesembarque || null);
+
+    setGeocodificando(true);
+    try {
+      if (endEmbFinal && (embMudou || latEmb === null || lngEmb === null)) {
+        const geoEmb = await geocodificarEndereco(endEmbFinal);
+        latEmb = geoEmb?.latitude ?? null;
+        lngEmb = geoEmb?.longitude ?? null;
+      }
+
+      if (mesmoEndereco) {
+        latDes = latEmb;
+        lngDes = lngEmb;
+      } else if (endDesFinal && (desMudou || latDes === null || lngDes === null)) {
+        const geoDes = await geocodificarEndereco(endDesFinal);
+        latDes = geoDes?.latitude ?? null;
+        lngDes = geoDes?.longitude ?? null;
+      }
+    } finally {
+      setGeocodificando(false);
+    }
 
     const payload = {
       nome: nome.trim(),
@@ -243,11 +229,11 @@ export default function AlunoFormScreen() {
       responsavelId: responsavelId.trim(),
       modalidade,
       enderecoEmbarque: endEmbFinal,
-      latitudeEmbarque: latEmb,
-      longitudeEmbarque: lngEmb,
+      latitudeEmbarque: Number.isNaN(latEmb) ? null : latEmb,
+      longitudeEmbarque: Number.isNaN(lngEmb) ? null : lngEmb,
       enderecoDesembarque: endDesFinal,
-      latitudeDesembarque: latDes,
-      longitudeDesembarque: lngDes,
+      latitudeDesembarque: Number.isNaN(latDes) ? null : latDes,
+      longitudeDesembarque: Number.isNaN(lngDes) ? null : lngDes,
       nomeContatoEntrega: nomeContatoEntrega.trim() || null,
       telefoneContatoEntrega: telefoneContatoEntrega.trim() || null,
       diaVencimentoMensalidade: diaVencParsed,
@@ -483,116 +469,6 @@ export default function AlunoFormScreen() {
               left={<TextInput.Icon icon="home-import-outline" />}
               style={styles.input}
             />
-          )}
-
-          <Button
-            mode="text"
-            compact
-            icon={mostrarGps ? "chevron-up" : "crosshairs-gps"}
-            onPress={() => setMostrarGps(!mostrarGps)}
-            style={styles.toggleLink}
-          >
-            {mostrarGps
-              ? "Ocultar coordenadas GPS"
-              : "Adicionar coordenadas GPS (opcional para Rota Inteligente)"}
-          </Button>
-
-          {mostrarGps && (
-            <View style={styles.gpsSection}>
-              <Text variant="labelMedium" style={styles.subLabel}>
-                Coordenadas de Embarque (Presets Recife):
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.presetRow}
-              >
-                {RECIFE_PRESETS.map((p) => (
-                  <Chip
-                    key={`emb-${p.label}`}
-                    compact
-                    onPress={() => applyPreset("embarque", p)}
-                    style={styles.presetChip}
-                  >
-                    {p.label}
-                  </Chip>
-                ))}
-              </ScrollView>
-              <View style={styles.row}>
-                <TextInput
-                  label="Lat. Embarque"
-                  placeholder="-8.1189"
-                  mode="outlined"
-                  keyboardType="numbers-and-punctuation"
-                  value={latitudeEmbarque}
-                  onChangeText={(v) => {
-                    setLatitudeEmbarque(v);
-                    if (mesmoEndereco) setLatitudeDesembarque(v);
-                  }}
-                  style={[styles.input, styles.halfInput]}
-                  dense
-                />
-                <TextInput
-                  label="Lng. Embarque"
-                  placeholder="-34.8988"
-                  mode="outlined"
-                  keyboardType="numbers-and-punctuation"
-                  value={longitudeEmbarque}
-                  onChangeText={(v) => {
-                    setLongitudeEmbarque(v);
-                    if (mesmoEndereco) setLongitudeDesembarque(v);
-                  }}
-                  style={[styles.input, styles.halfInput]}
-                  dense
-                />
-              </View>
-
-              {!mesmoEndereco && (
-                <>
-                  <Text variant="labelMedium" style={styles.subLabel}>
-                    Coordenadas de Desembarque (Presets Recife):
-                  </Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.presetRow}
-                  >
-                    {RECIFE_PRESETS.map((p) => (
-                      <Chip
-                        key={`des-${p.label}`}
-                        compact
-                        onPress={() => applyPreset("desembarque", p)}
-                        style={styles.presetChip}
-                      >
-                        {p.label}
-                      </Chip>
-                    ))}
-                  </ScrollView>
-                  <View style={styles.row}>
-                    <TextInput
-                      label="Lat. Desembarque"
-                      placeholder="-8.0439"
-                      mode="outlined"
-                      keyboardType="numbers-and-punctuation"
-                      value={latitudeDesembarque}
-                      onChangeText={setLatitudeDesembarque}
-                      style={[styles.input, styles.halfInput]}
-                      dense
-                    />
-                    <TextInput
-                      label="Lng. Desembarque"
-                      placeholder="-34.8939"
-                      mode="outlined"
-                      keyboardType="numbers-and-punctuation"
-                      value={longitudeDesembarque}
-                      onChangeText={setLongitudeDesembarque}
-                      style={[styles.input, styles.halfInput]}
-                      dense
-                    />
-                  </View>
-                </>
-              )}
-            </View>
           )}
 
           <Divider style={styles.divider} />
