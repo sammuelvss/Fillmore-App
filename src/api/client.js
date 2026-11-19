@@ -41,34 +41,77 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
+// Renova a sessão uma única vez mesmo com várias requisições 401 simultâneas
+let refreshPromise = null;
+
+const renovarSessao = async () => {
+  const { refreshToken, setTokens } = useAuthStore.getState();
+  if (!refreshToken) throw new Error("Sem refresh token");
+
+  if (!refreshPromise) {
+    // Usa axios puro para não passar pelos interceptors
+    refreshPromise = axios
+      .post(`${API_BASE_URL}/session/refresh`, { refreshToken }, { timeout: 15000 })
+      .then(({ data }) => {
+        setTokens({
+          token: data.token,
+          refreshToken: data.refreshToken,
+          user: data.user,
+        });
+        return data.token;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+
+  return refreshPromise;
+};
+
+const isRotaDeAutenticacao = (config) => {
+  const url = config?.url || "";
+  const method = config?.method?.toLowerCase();
+  return (url.endsWith("/session") && method === "post") || url.includes("/session/refresh");
+};
+
+const anexarMensagemAmigavel = (error) => {
+  const status = error.response?.status;
+  const apiMessage = error.response?.data?.message;
+
+  // Anexa mensagem amigável padronizada pelo AppError do Express 5
+  error.friendlyMessage =
+    apiMessage ||
+    (status === 429
+      ? "Muitas tentativas seguidas (Rate Limit). Aguarde alguns minutos."
+      : status === 403
+        ? "Você não tem permissão para realizar esta operação."
+        : error.message === "Network Error"
+          ? "Sem conexão com o servidor. Verifique o arquivo .env (EXPO_PUBLIC_API_URL) e sua internet."
+          : "Ocorreu um erro inesperado na comunicação com o servidor.");
+
+  return error;
+};
+
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const status = error.response?.status;
-    const apiMessage = error.response?.data?.message;
+    const original = error.config;
 
-    // Se o token expirou ou foi revogado na tabela TokenRevogado (401), limpa sessão local
-    // (Exceto se o 401 veio da própria tentativa de login em POST /session)
-    const isLoginAttempt =
-      error.config?.url?.includes("/session") &&
-      error.config?.method?.toLowerCase() === "post";
-
-    if (status === 401 && !isLoginAttempt) {
-      useAuthStore.getState().clearAuth();
+    // Access token expirado/revogado: tenta renovar com o refresh token e repete a requisição
+    if (status === 401 && original && !original._retry && !isRotaDeAutenticacao(original)) {
+      original._retry = true;
+      try {
+        const novoToken = await renovarSessao();
+        original.headers = original.headers || {};
+        original.headers.Authorization = `Bearer ${novoToken}`;
+        return apiClient(original);
+      } catch {
+        useAuthStore.getState().clearAuth();
+      }
     }
 
-    // Anexa mensagem amigável padronizada pelo AppError do Express 5
-    error.friendlyMessage =
-      apiMessage ||
-      (status === 429
-        ? "Muitas tentativas seguidas (Rate Limit). Aguarde alguns minutos."
-        : status === 403
-          ? "Você não tem permissão para realizar esta operação."
-          : error.message === "Network Error"
-            ? "Sem conexão com o servidor. Verifique o arquivo .env (EXPO_PUBLIC_API_URL) e sua internet."
-            : "Ocorreu um erro inesperado na comunicação com o servidor.");
-
-    return Promise.reject(error);
+    return Promise.reject(anexarMensagemAmigavel(error));
   },
 );
 
