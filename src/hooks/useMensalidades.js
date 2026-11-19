@@ -99,6 +99,12 @@ export function useCreateMensalidadeMutation() {
     },
     onSuccess: (_, variables) => {
       invalidateMensalidades(queryClient, variables.alunoId);
+      if (variables?.alunoId) {
+        queryClient.invalidateQueries({
+          queryKey: ["notificacoes", variables.alunoId],
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["notificacoes-responsavel"] });
     },
   });
 }
@@ -118,6 +124,12 @@ export function useRegistrarPagamentoMutation() {
       }),
     onSuccess: (_, variables) => {
       invalidateMensalidades(queryClient, variables.alunoId);
+      if (variables?.alunoId) {
+        queryClient.invalidateQueries({
+          queryKey: ["notificacoes", variables.alunoId],
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["notificacoes-responsavel"] });
     },
   });
 }
@@ -133,6 +145,12 @@ export function useUpdateMensalidadeMutation() {
       updateMensalidade({ alunoId, mensalidadeId, data }),
     onSuccess: (_, variables) => {
       invalidateMensalidades(queryClient, variables.alunoId);
+      if (variables?.alunoId) {
+        queryClient.invalidateQueries({
+          queryKey: ["notificacoes", variables.alunoId],
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["notificacoes-responsavel"] });
     },
   });
 }
@@ -148,6 +166,12 @@ export function useDeleteMensalidadeMutation() {
       deleteMensalidade({ alunoId, mensalidadeId }),
     onSuccess: (_, variables) => {
       invalidateMensalidades(queryClient, variables.alunoId);
+      if (variables?.alunoId) {
+        queryClient.invalidateQueries({
+          queryKey: ["notificacoes", variables.alunoId],
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["notificacoes-responsavel"] });
     },
   });
 }
@@ -164,6 +188,12 @@ export function useDispararCobrancaMutation() {
       dispararCobrancaMensalidade({ alunoId, mensalidadeId }),
     onSuccess: (_, variables) => {
       invalidateMensalidades(queryClient, variables.alunoId);
+      if (variables?.alunoId) {
+        queryClient.invalidateQueries({
+          queryKey: ["notificacoes", variables.alunoId],
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["notificacoes-responsavel"] });
     },
   });
 }

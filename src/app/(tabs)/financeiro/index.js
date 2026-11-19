@@ -32,6 +32,7 @@ import {
   useMensalidadesQuery,
   usePendenciasResponsavelQuery,
   useCreateMensalidadeMutation,
+  useUpdateMensalidadeMutation,
   useRegistrarPagamentoMutation,
   useDeleteMensalidadeMutation,
   useDispararCobrancaMutation,
@@ -96,12 +97,24 @@ function calcularDiasAtraso(dataVencimento, status) {
 
 function converterDataParaISO(dataTexto) {
   const limpo = dataTexto.trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(limpo)) return limpo;
-  const matchBR = limpo.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (matchBR) {
-    return `${matchBR[3]}-${matchBR[2]}-${matchBR[1]}`;
+  let iso = null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(limpo)) {
+    iso = limpo;
+  } else {
+    const matchBR = limpo.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (matchBR) {
+      iso = `${matchBR[3]}-${matchBR[2]}-${matchBR[1]}`;
+    }
   }
-  return null;
+  if (!iso) return null;
+
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const valida =
+    dt.getUTCFullYear() === y &&
+    dt.getUTCMonth() + 1 === m &&
+    dt.getUTCDate() === d;
+  return valida ? iso : null;
 }
 
 export default function FinanceiroScreen() {
@@ -217,12 +230,16 @@ export default function FinanceiroScreen() {
   } = usePendenciasResponsavelQuery(isResponsavel ? responsavelId : null);
 
   const criarMutation = useCreateMensalidadeMutation();
+  const atualizarMutation = useUpdateMensalidadeMutation();
   const registrarPagamentoMutation = useRegistrarPagamentoMutation();
   const excluirMutation = useDeleteMensalidadeMutation();
   const cobrarMutation = useDispararCobrancaMutation();
 
   const hoje = new Date();
   const [modalCriarVisivel, setModalCriarVisivel] = useState(false);
+  const [mensalidadeEditando, setMensalidadeEditando] = useState(null);
+  const [pagandoId, setPagandoId] = useState(null);
+  const [cobrandoId, setCobrandoId] = useState(null);
   const [mesReferencia, setMesReferencia] = useState(
     String(hoje.getMonth() + 1).padStart(2, "0")
   );
@@ -238,6 +255,29 @@ export default function FinanceiroScreen() {
   );
   const [statusNovo, setStatusNovo] = useState("PENDENTE");
   const [mensalidadeParaExcluir, setMensalidadeParaExcluir] = useState(null);
+
+  const abrirModalCriar = () => {
+    const agora = new Date();
+    const dia = String(alunoAtivo?.diaVencimentoMensalidade || 10).padStart(2, "0");
+    const mes = String(agora.getMonth() + 1).padStart(2, "0");
+    setMensalidadeEditando(null);
+    setMesReferencia(mes);
+    setAnoReferencia(String(agora.getFullYear()));
+    setValor("250.00");
+    setDataVencimento(`${dia}/${mes}/${agora.getFullYear()}`);
+    setStatusNovo("PENDENTE");
+    setModalCriarVisivel(true);
+  };
+
+  const abrirModalEditar = (item) => {
+    setMensalidadeEditando(item);
+    setMesReferencia(String(item.mesReferencia).padStart(2, "0"));
+    setAnoReferencia(String(item.anoReferencia));
+    setValor(String(item.valor ?? ""));
+    setDataVencimento(formatarDataBR(item.dataVencimento));
+    setStatusNovo(item.status || "PENDENTE");
+    setModalCriarVisivel(true);
+  };
 
   useEffect(() => {
     if (alunoAtivo?.diaVencimentoMensalidade) {
@@ -289,30 +329,43 @@ export default function FinanceiroScreen() {
     }
 
     try {
-      await criarMutation.mutateAsync({
-        alunoId: alunoAtivo.id,
-        data: {
-          mesReferencia: mesNum,
-          anoReferencia: anoNum,
-          valor: valorNum,
-          dataVencimento: dataIso,
-          status: statusNovo,
-          ...(statusNovo === "PAGO"
-            ? { dataPagamento: new Date().toISOString() }
-            : {}),
-        },
-      });
+      const payload = {
+        mesReferencia: mesNum,
+        anoReferencia: anoNum,
+        valor: valorNum,
+        dataVencimento: dataIso,
+        status: statusNovo,
+        ...(statusNovo === "PAGO"
+          ? { dataPagamento: mensalidadeEditando?.dataPagamento || new Date().toISOString() }
+          : { dataPagamento: null }),
+      };
+
+      if (mensalidadeEditando) {
+        await atualizarMutation.mutateAsync({
+          alunoId: alunoAtivo.id,
+          mensalidadeId: mensalidadeEditando.id,
+          data: payload,
+        });
+        showSnackbar("Mensalidade atualizada com sucesso!", "success");
+      } else {
+        await criarMutation.mutateAsync({
+          alunoId: alunoAtivo.id,
+          data: payload,
+        });
+        showSnackbar("Mensalidade lançada com sucesso!", "success");
+      }
       setModalCriarVisivel(false);
-      showSnackbar("Mensalidade lançada com sucesso!", "success");
+      setMensalidadeEditando(null);
     } catch (error) {
       showSnackbar(
-        error.friendlyMessage || "Erro ao criar mensalidade.",
+        error.friendlyMessage || "Erro ao salvar mensalidade.",
         "error"
       );
     }
   };
 
   const handleMarcarComoPago = async (mensalidade) => {
+    setPagandoId(mensalidade.id);
     try {
       await registrarPagamentoMutation.mutateAsync({
         alunoId: alunoAtivo.id,
@@ -325,10 +378,13 @@ export default function FinanceiroScreen() {
         error.friendlyMessage || "Erro ao registrar pagamento.",
         "error"
       );
+    } finally {
+      setPagandoId(null);
     }
   };
 
   const handleCobrarEmUmClique = async (mensalidade) => {
+    setCobrandoId(mensalidade.id);
     try {
       await cobrarMutation.mutateAsync({
         alunoId: alunoAtivo.id,
@@ -343,6 +399,8 @@ export default function FinanceiroScreen() {
         error.friendlyMessage || "Erro ao enviar cobrança.",
         "error"
       );
+    } finally {
+      setCobrandoId(null);
     }
   };
 
@@ -383,7 +441,7 @@ export default function FinanceiroScreen() {
   const titularPixMotorista =
     faturasPendentesResp[0]?.pagamentoPix?.titularPix ||
     motoristaDoAluno?.titularPix ||
-    user?.nome ||
+    (isMotorista ? user?.nome : null) ||
     "Motorista Escolar";
 
   return (
@@ -587,9 +645,7 @@ export default function FinanceiroScreen() {
             title="Nenhuma mensalidade registrada"
             description={`Ainda não existem faturas lançadas para ${alunoAtivo.nome}.`}
             actionLabel={isMotorista ? "Lançar Primeira Fatura" : undefined}
-            onAction={
-              isMotorista ? () => setModalCriarVisivel(true) : undefined
-            }
+            onAction={isMotorista ? abrirModalCriar : undefined}
           />
         ) : (
           mensalidades.map((item) => {
@@ -638,12 +694,20 @@ export default function FinanceiroScreen() {
                     </Chip>
 
                     {isMotorista && (
-                      <IconButton
-                        icon="delete-outline"
-                        iconColor={colors.error}
-                        size={20}
-                        onPress={() => setMensalidadeParaExcluir(item)}
-                      />
+                      <>
+                        <IconButton
+                          icon="pencil-outline"
+                          iconColor={colors.secondary}
+                          size={20}
+                          onPress={() => abrirModalEditar(item)}
+                        />
+                        <IconButton
+                          icon="delete-outline"
+                          iconColor={colors.error}
+                          size={20}
+                          onPress={() => setMensalidadeParaExcluir(item)}
+                        />
+                      </>
                     )}
                   </View>
                 </View>
@@ -676,7 +740,8 @@ export default function FinanceiroScreen() {
                       icon="check"
                       textColor="#166534"
                       style={[styles.actionBtn, { borderColor: "#166534" }]}
-                      loading={registrarPagamentoMutation.isPending}
+                      loading={pagandoId === item.id}
+                      disabled={pagandoId === item.id || cobrandoId === item.id}
                       onPress={() => handleMarcarComoPago(item)}
                     >
                       Dar Baixa
@@ -689,7 +754,8 @@ export default function FinanceiroScreen() {
                       textColor={colors.secondary}
                       style={styles.actionBtn}
                       labelStyle={{ fontWeight: "800" }}
-                      loading={cobrarMutation.isPending}
+                      loading={cobrandoId === item.id}
+                      disabled={pagandoId === item.id || cobrandoId === item.id}
                       onPress={() => handleCobrarEmUmClique(item)}
                     >
                       Cobrar 1 Clique
@@ -722,20 +788,26 @@ export default function FinanceiroScreen() {
           label="Nova Fatura"
           style={styles.fab}
           color={colors.secondary}
-          onPress={() => setModalCriarVisivel(true)}
+          onPress={abrirModalCriar}
         />
       ) : null}
 
-      {/* Dialog: Lançar Mensalidade */}
+      {/* Dialog: Lançar ou Editar Mensalidade */}
       <Portal>
         <Dialog
           visible={modalCriarVisivel}
-          onDismiss={() => setModalCriarVisivel(false)}
+          onDismiss={() => {
+            setModalCriarVisivel(false);
+            setMensalidadeEditando(null);
+          }}
           style={styles.dialog}
         >
-          <Dialog.Icon icon="cash-plus" color={colors.primaryDark} />
+          <Dialog.Icon
+            icon={mensalidadeEditando ? "pencil-outline" : "cash-plus"}
+            color={colors.primaryDark}
+          />
           <Dialog.Title style={styles.dialogTitle}>
-            Lançar Mensalidade
+            {mensalidadeEditando ? "Editar Mensalidade" : "Lançar Mensalidade"}
           </Dialog.Title>
           <Dialog.Content>
             <Text
@@ -814,10 +886,11 @@ export default function FinanceiroScreen() {
               mode="contained"
               buttonColor={colors.primary}
               textColor={colors.secondary}
-              loading={criarMutation.isPending}
+              loading={criarMutation.isPending || atualizarMutation.isPending}
+              disabled={criarMutation.isPending || atualizarMutation.isPending}
               onPress={handleCriarMensalidade}
             >
-              Salvar
+              {mensalidadeEditando ? "Atualizar" : "Salvar"}
             </Button>
           </Dialog.Actions>
         </Dialog>

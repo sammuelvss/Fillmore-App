@@ -11,6 +11,7 @@ import {
   Portal,
   HelperText,
 } from "react-native-paper";
+import { useRouter } from "expo-router";
 import { colors } from "../../../theme";
 import { useAuthStore } from "../../../store/useAuthStore";
 import {
@@ -22,6 +23,7 @@ import {
 
 // Meu Perfil: GET/PUT/DELETE /users/:id e logout
 export default function PerfilScreen() {
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const isMotorista = user?.tipo === "MOTORISTA";
 
@@ -182,6 +184,14 @@ export default function PerfilScreen() {
         </Surface>
 
         <Surface style={styles.card} elevation={1}>
+          <Button
+            mode="outlined"
+            icon="information-outline"
+            onPress={() => router.push("/(tabs)/sobre")}
+            style={styles.button}
+          >
+            Sobre o Projeto
+          </Button>
           <Button mode="contained-tonal" icon="logout" onPress={() => setDialog("logout")}>
             Sair da conta
           </Button>

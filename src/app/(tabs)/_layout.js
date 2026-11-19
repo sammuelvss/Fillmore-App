@@ -1,13 +1,39 @@
 import React from "react";
-import { Tabs } from "expo-router";
+import { TouchableOpacity } from "react-native";
+import { Tabs, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { colors } from "../../theme";
 
 /**
- * Navegação Principal em Abas (Bottom Tabs — Expo Router)
- * Contempla as telas gerais (Home e Sobre) + 1 fluxo dedicado por módulo da equipe.
+ * Navegação Principal em Abas (5 abas principais; Perfil e Sobre acessíveis pelo cabeçalho/Home)
  */
 export default function TabsLayout() {
+  const router = useRouter();
+
+  const renderPerfilHeaderButton = () => (
+    <TouchableOpacity
+      onPress={() => router.push("/(tabs)/perfil")}
+      style={{ marginRight: 14, padding: 4 }}
+      accessibilityLabel="Abrir Meu Perfil"
+    >
+      <MaterialCommunityIcons
+        name="account-circle-outline"
+        size={26}
+        color="#FFFFFF"
+      />
+    </TouchableOpacity>
+  );
+
+  const renderVoltarHomeButton = () => (
+    <TouchableOpacity
+      onPress={() => router.replace("/(tabs)")}
+      style={{ marginLeft: 14, padding: 4 }}
+      accessibilityLabel="Voltar para Início"
+    >
+      <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
+    </TouchableOpacity>
+  );
+
   return (
     <Tabs
       screenOptions={{
@@ -18,6 +44,7 @@ export default function TabsLayout() {
         headerTitleStyle: {
           fontWeight: "800",
         },
+        headerRight: renderPerfilHeaderButton,
         tabBarActiveTintColor: colors.primaryDark,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
@@ -111,30 +138,21 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="perfil/index"
         options={{
+          href: null,
           title: "Perfil",
           headerTitle: "Meu Perfil",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="account-circle-outline"
-              size={size}
-              color={color}
-            />
-          ),
+          headerLeft: renderVoltarHomeButton,
+          headerRight: () => null,
         }}
       />
 
       <Tabs.Screen
         name="sobre"
         options={{
+          href: null,
           title: "Sobre",
           headerTitle: "Sobre o Projeto & Equipe",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="information-outline"
-              size={size}
-              color={color}
-            />
-          ),
+          headerLeft: renderVoltarHomeButton,
         }}
       />
     </Tabs>

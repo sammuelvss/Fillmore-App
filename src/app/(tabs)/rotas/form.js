@@ -10,6 +10,7 @@ import {
   Text,
   TextInput,
   Button,
+  Chip,
   Surface,
   SegmentedButtons,
   HelperText,
@@ -23,6 +24,7 @@ import {
   useCreateRotaMutation,
   useUpdateRotaMutation,
 } from "../../../hooks/useRotas";
+import { BAIRROS_RECIFE, geocodificarEndereco } from "../../../utils/geocoding";
 
 /**
  * ============================================================================
@@ -60,6 +62,9 @@ export default function RotaFormScreen() {
   const [pontoFinalLng, setPontoFinalLng] = useState(
     params.pontoFinalLng ? String(params.pontoFinalLng) : "",
   );
+  const [localPartida, setLocalPartida] = useState("");
+  const [localDestino, setLocalDestino] = useState("");
+  const [geocodificando, setGeocodificando] = useState(false);
   const [distanciaTotalKm, setDistanciaTotalKm] = useState(
     params.distanciaTotalKm ? String(params.distanciaTotalKm) : "",
   );
@@ -124,7 +129,8 @@ export default function RotaFormScreen() {
 
   const createMutation = useCreateRotaMutation();
   const updateMutation = useUpdateRotaMutation();
-  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+  const isSubmitting =
+    geocodificando || createMutation.isPending || updateMutation.isPending;
 
   const parseOptionalFloat = (val) => {
     if (val === "" || val === null || val === undefined) return null;
@@ -147,24 +153,12 @@ export default function RotaFormScreen() {
       return;
     }
 
-    const latIni = parseOptionalFloat(pontoInicialLat);
-    const lngIni = parseOptionalFloat(pontoInicialLng);
-    const latFim = parseOptionalFloat(pontoFinalLat);
-    const lngFim = parseOptionalFloat(pontoFinalLng);
+    let latIni = parseOptionalFloat(pontoInicialLat);
+    let lngIni = parseOptionalFloat(pontoInicialLng);
+    let latFim = parseOptionalFloat(pontoFinalLat);
+    let lngFim = parseOptionalFloat(pontoFinalLng);
     const distKm = parseOptionalFloat(distanciaTotalKm);
     const tempoMin = parseOptionalInt(tempoEstimadoMin);
-
-    if (
-      Number.isNaN(latIni) ||
-      Number.isNaN(lngIni) ||
-      Number.isNaN(latFim) ||
-      Number.isNaN(lngFim)
-    ) {
-      setFormError(
-        "As coordenadas de latitude/longitude informadas devem ser números válidos (ex.: -8.1189).",
-      );
-      return;
-    }
 
     if (Number.isNaN(distKm) || (distKm !== null && distKm < 0)) {
       setFormError("Informe uma distância em km válida (ex.: 12.5).");
@@ -176,13 +170,35 @@ export default function RotaFormScreen() {
       return;
     }
 
+    if (localPartida.trim() || localDestino.trim()) {
+      setGeocodificando(true);
+      try {
+        if (localPartida.trim()) {
+          const geoIni = await geocodificarEndereco(localPartida);
+          if (geoIni) {
+            latIni = geoIni.latitude;
+            lngIni = geoIni.longitude;
+          }
+        }
+        if (localDestino.trim()) {
+          const geoFim = await geocodificarEndereco(localDestino);
+          if (geoFim) {
+            latFim = geoFim.latitude;
+            lngFim = geoFim.longitude;
+          }
+        }
+      } finally {
+        setGeocodificando(false);
+      }
+    }
+
     const payload = {
       nome: nome.trim(),
       turno,
-      pontoInicialLat: latIni,
-      pontoInicialLng: lngIni,
-      pontoFinalLat: latFim,
-      pontoFinalLng: lngFim,
+      pontoInicialLat: Number.isNaN(latIni) ? null : latIni,
+      pontoInicialLng: Number.isNaN(lngIni) ? null : lngIni,
+      pontoFinalLat: Number.isNaN(latFim) ? null : latFim,
+      pontoFinalLng: Number.isNaN(lngFim) ? null : lngFim,
       distanciaTotalKm: distKm,
       tempoEstimadoMin: tempoMin,
     };
@@ -291,63 +307,65 @@ export default function RotaFormScreen() {
           <Divider style={styles.divider} />
 
           <Text variant="titleMedium" style={styles.sectionTitle}>
-            3. Coordenadas GPS (Ponto Inicial e Final)
+            3. Locais de Partida e Destino (Opcional)
           </Text>
           <Text variant="bodySmall" style={styles.coordHelper}>
-            Opcional: coordenadas geográficas de partida e chegada em Recife.
+            Informe o bairro ou endereço para posicionar a rota no mapa automaticamente.
           </Text>
 
-          <Text variant="labelMedium" style={styles.subLabel}>
-            Ponto Inicial (Origem)
-          </Text>
-          <View style={styles.row}>
-            <TextInput
-              label="Latitude Inicial"
-              placeholder="-8.1189"
-              mode="outlined"
-              keyboardType="numbers-and-punctuation"
-              value={pontoInicialLat}
-              onChangeText={setPontoInicialLat}
-              style={[styles.input, styles.halfInput]}
-              dense
-            />
-            <TextInput
-              label="Longitude Inicial"
-              placeholder="-34.8988"
-              mode="outlined"
-              keyboardType="numbers-and-punctuation"
-              value={pontoInicialLng}
-              onChangeText={setPontoInicialLng}
-              style={[styles.input, styles.halfInput]}
-              dense
-            />
-          </View>
+          <TextInput
+            label="Local ou Bairro de Partida"
+            placeholder="Ex.: Boa Viagem ou Av. Conselheiro Aguiar"
+            mode="outlined"
+            value={localPartida}
+            onChangeText={setLocalPartida}
+            left={<TextInput.Icon icon="map-marker-outline" />}
+            style={styles.input}
+          />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.bairrosRow}
+          >
+            {BAIRROS_RECIFE.map((b) => (
+              <Chip
+                key={`ini-${b.label}`}
+                compact
+                selected={localPartida === b.label}
+                onPress={() => setLocalPartida(b.label)}
+                style={styles.bairroChip}
+              >
+                {b.label}
+              </Chip>
+            ))}
+          </ScrollView>
 
-          <Text variant="labelMedium" style={styles.subLabel}>
-            Ponto Final (Destino / Escola)
-          </Text>
-          <View style={styles.row}>
-            <TextInput
-              label="Latitude Final"
-              placeholder="-8.0567"
-              mode="outlined"
-              keyboardType="numbers-and-punctuation"
-              value={pontoFinalLat}
-              onChangeText={setPontoFinalLat}
-              style={[styles.input, styles.halfInput]}
-              dense
-            />
-            <TextInput
-              label="Longitude Final"
-              placeholder="-34.8999"
-              mode="outlined"
-              keyboardType="numbers-and-punctuation"
-              value={pontoFinalLng}
-              onChangeText={setPontoFinalLng}
-              style={[styles.input, styles.halfInput]}
-              dense
-            />
-          </View>
+          <TextInput
+            label="Local ou Escola de Destino"
+            placeholder="Ex.: Colégio Santa Maria ou Derby"
+            mode="outlined"
+            value={localDestino}
+            onChangeText={setLocalDestino}
+            left={<TextInput.Icon icon="flag-checkered" />}
+            style={styles.input}
+          />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.bairrosRow}
+          >
+            {BAIRROS_RECIFE.map((b) => (
+              <Chip
+                key={`fim-${b.label}`}
+                compact
+                selected={localDestino === b.label}
+                onPress={() => setLocalDestino(b.label)}
+                style={styles.bairroChip}
+              >
+                {b.label}
+              </Chip>
+            ))}
+          </ScrollView>
 
           {formError ? (
             <HelperText type="error" visible style={styles.errorText}>
@@ -441,6 +459,13 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: -6,
     marginBottom: 12,
+  },
+  bairrosRow: {
+    gap: 6,
+    marginBottom: 12,
+  },
+  bairroChip: {
+    backgroundColor: colors.surfaceVariant,
   },
   subLabel: {
     color: colors.secondary,
