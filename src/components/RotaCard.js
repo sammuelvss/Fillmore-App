@@ -183,35 +183,19 @@ export default function RotaCard({
           />
         </View>
 
-        {/* Coordenadas Geográficas (se preenchidas) */}
+        {/* Indicador de Mapa GPS */}
         {(temCoordenadasIniciais || temCoordenadasFinais) && (
           <View style={styles.coordsContainer}>
-            {temCoordenadasIniciais && (
-              <View style={styles.coordItem}>
-                <MaterialCommunityIcons
-                  name="ray-start-arrow"
-                  size={15}
-                  color={colors.success}
-                />
-                <Text variant="labelSmall" style={styles.coordText}>
-                  Origem: {Number(rota.pontoInicialLat).toFixed(4)},{" "}
-                  {Number(rota.pontoInicialLng).toFixed(4)}
-                </Text>
-              </View>
-            )}
-            {temCoordenadasFinais && (
-              <View style={styles.coordItem}>
-                <MaterialCommunityIcons
-                  name="flag-checkered"
-                  size={15}
-                  color={colors.error}
-                />
-                <Text variant="labelSmall" style={styles.coordText}>
-                  Destino: {Number(rota.pontoFinalLat).toFixed(4)},{" "}
-                  {Number(rota.pontoFinalLng).toFixed(4)}
-                </Text>
-              </View>
-            )}
+            <View style={styles.coordItem}>
+              <MaterialCommunityIcons
+                name="map-check-outline"
+                size={15}
+                color={colors.success}
+              />
+              <Text variant="labelSmall" style={styles.coordText}>
+                Mapa GPS configurado para a Rota Inteligente
+              </Text>
+            </View>
           </View>
         )}
 
