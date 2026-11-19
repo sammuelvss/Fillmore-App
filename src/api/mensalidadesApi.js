@@ -10,6 +10,7 @@ import apiClient from "./client";
  *    - POST   /alunos/:alunoId/mensalidades
  *    - GET    /alunos/:alunoId/mensalidades/:id
  *    - PUT    /alunos/:alunoId/mensalidades/:id
+ *    - PATCH  /alunos/:alunoId/mensalidades/:mensalidadeId/pagamento
  *    - DELETE /alunos/:alunoId/mensalidades/:id
  *
  * 2. Extrato de Inadimplência e Ciência do Responsável (+ Chave Pix):
@@ -40,6 +41,18 @@ export const updateMensalidade = async ({ alunoId, mensalidadeId, data }) => {
   return response.data;
 };
 
+export const registrarPagamentoMensalidade = async ({
+  alunoId,
+  mensalidadeId,
+  dataPagamento = new Date().toISOString(),
+}) => {
+  const response = await apiClient.patch(
+    `/alunos/${alunoId}/mensalidades/${mensalidadeId}/pagamento`,
+    { dataPagamento },
+  );
+  return response.data;
+};
+
 export const deleteMensalidade = async ({ alunoId, mensalidadeId }) => {
   await apiClient.delete(`/alunos/${alunoId}/mensalidades/${mensalidadeId}`);
   return mensalidadeId;
@@ -66,6 +79,7 @@ export default {
   getMensalidadesDoAluno,
   createMensalidade,
   updateMensalidade,
+  registrarPagamentoMensalidade,
   deleteMensalidade,
   getMensalidadesPendentesResponsavel,
   dispararCobrancaMensalidade,

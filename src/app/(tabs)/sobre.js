@@ -52,7 +52,7 @@ export default function SobreScreen() {
     {
       ordem: "4º",
       nome: "Paulo",
-      ra: "RA: [Preencher RA de Paulo]",
+      ra: "RA:00000859899",
       papel: "Controle Financeiro de Mensalidades, Relacionamento 2 & Extrato de Pendências + Pix",
       endpoints: "CRUD /alunos/:id/mensalidades, GET /responsaveis/:id/mensalidades/pendentes",
       icon: "cash-multiple",
