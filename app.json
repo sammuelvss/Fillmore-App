@@ -2,6 +2,11 @@
   "expo": {
     "name": "Fillmore Transporte Escolar",
     "slug": "fillmore-mobile",
+    "owner": "sammuelvictors-team",
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "fillmore",
@@ -30,6 +35,22 @@
     ],
     "experiments": {
       "typedRoutes": false
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "be5a0b6f-0da6-4cf9-a005-72a44672811b"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/be5a0b6f-0da6-4cf9-a005-72a44672811b"
     }
   }
 }
