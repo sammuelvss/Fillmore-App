@@ -16,6 +16,8 @@ import { useLoginMutation } from "../../hooks/useAuth";
 import { getSessionRequest } from "../../api/authApi";
 import { API_BASE_URL } from "../../api/client";
 
+const SHOW_DEV_TOOLS = process.env.EXPO_PUBLIC_SHOW_DEV === "true";
+
 // Login (POST /session) + Quick Token para evitar o rate limit de 5 logins/15 min
 export default function LoginScreen() {
   const router = useRouter();
@@ -134,38 +136,40 @@ export default function LoginScreen() {
           </Button>
         </Surface>
 
-        <Surface style={styles.devCard} elevation={1}>
-          <View style={styles.devHeader}>
-            <Text variant="titleSmall" style={styles.devTitle}>Modo Dev / Quick Token</Text>
-            <Button compact onPress={() => setShowDev(!showDev)}>
-              {showDev ? "Ocultar" : "Expandir"}
-            </Button>
-          </View>
-          <Text variant="bodySmall">API: {API_BASE_URL}</Text>
-
-          {showDev && (
-            <View style={styles.devBody}>
-              <TextInput
-                label="Token JWT real (Bearer)"
-                mode="outlined"
-                dense
-                value={manualToken}
-                onChangeText={setManualToken}
-                autoCapitalize="none"
-                style={styles.input}
-              />
-              <Button
-                mode="contained"
-                loading={loadingQuick}
-                disabled={loadingQuick}
-                onPress={handleQuickToken}
-                buttonColor={colors.secondary}
-              >
-                Acessar com Token
+        {SHOW_DEV_TOOLS && (
+          <Surface style={styles.devCard} elevation={1}>
+            <View style={styles.devHeader}>
+              <Text variant="titleSmall" style={styles.devTitle}>Modo Dev / Quick Token</Text>
+              <Button compact onPress={() => setShowDev(!showDev)}>
+                {showDev ? "Ocultar" : "Expandir"}
               </Button>
             </View>
-          )}
-        </Surface>
+            <Text variant="bodySmall">API: {API_BASE_URL}</Text>
+
+            {showDev && (
+              <View style={styles.devBody}>
+                <TextInput
+                  label="Token JWT real (Bearer)"
+                  mode="outlined"
+                  dense
+                  value={manualToken}
+                  onChangeText={setManualToken}
+                  autoCapitalize="none"
+                  style={styles.input}
+                />
+                <Button
+                  mode="contained"
+                  loading={loadingQuick}
+                  disabled={loadingQuick}
+                  onPress={handleQuickToken}
+                  buttonColor={colors.secondary}
+                >
+                  Acessar com Token
+                </Button>
+              </View>
+            )}
+          </Surface>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
