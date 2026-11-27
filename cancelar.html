@@ -131,18 +131,6 @@
       box.innerText = msg;
     }
 
-    async function obterToken() {
-      if (tkParam) return tkParam;
-      var resp = await fetch(API_BASE + "/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: "carlos.silva@fillmore.app", senha: "resp1234" })
-      });
-      var data = await resp.json();
-      tkParam = data.token;
-      return tkParam;
-    }
-
     async function verificarEstadoInicial() {
       if (!alunoId) {
         mostrarStatus("Link incompleto: identificador do aluno não encontrado.", "error");
@@ -150,10 +138,7 @@
         return;
       }
       try {
-        var tk = await obterToken();
-        var res = await fetch(API_BASE + "/alunos/" + alunoId + "/viagens", {
-          headers: { "Authorization": "Bearer " + tk }
-        });
+        var res = await fetch(API_BASE + "/public/alunos/" + alunoId + "/viagens");
         if (!res.ok) return;
         var lista = await res.json();
         if (Array.isArray(lista)) {
@@ -178,12 +163,10 @@
       btn.innerText = "Avisando motorista...";
 
       try {
-        var tk = await obterToken();
-        var res = await fetch(API_BASE + "/alunos/" + alunoId + "/viagens", {
+        var res = await fetch(API_BASE + "/public/alunos/" + alunoId + "/viagens", {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + tk
+            "Content-Type": "application/json"
           },
           body: JSON.stringify({
             data: dataHoje,
@@ -212,11 +195,10 @@
       btnR.disabled = true;
       btnR.innerText = "Reativando...";
       try {
-        var tk = await obterToken();
-        await fetch(API_BASE + "/alunos/" + alunoId + "/viagens/" + viagemCriadaId, {
-          method: "DELETE",
-          headers: { "Authorization": "Bearer " + tk }
+        var res = await fetch(API_BASE + "/public/alunos/" + alunoId + "/viagens/" + viagemCriadaId, {
+          method: "DELETE"
         });
+        if (!res.ok) throw new Error();
         viagemCriadaId = null;
         mostrarStatus("🚐 Presença reativada! O aluno voltou para a rota de hoje.", "info");
         document.getElementById("reativarArea").style.display = "none";
