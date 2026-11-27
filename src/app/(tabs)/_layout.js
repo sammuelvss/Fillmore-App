@@ -131,15 +131,6 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
-        name="operacao/index"
-        options={{
-          href: null,
-          title: "Operação",
-          headerTitle: "Diário de Bordo",
-        }}
-      />
-
-      <Tabs.Screen
         name="perfil/index"
         options={{
           href: null,
