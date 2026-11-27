@@ -11,34 +11,23 @@ import {
   SegmentedButtons,
   Searchbar,
   FAB,
-  Portal,
-  Dialog,
-  Button,
   ActivityIndicator,
-  Banner,
 } from "react-native-paper";
 import { useRouter } from "expo-router";
 import { colors } from "../../../theme";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { useAppStore } from "../../../store/useAppStore";
-import {
-  useRotasQuery,
-  useDeleteRotaMutation,
-} from "../../../hooks/useRotas";
+import { useRotasQuery } from "../../../hooks/useRotas";
 import RotaCard from "../../../components/RotaCard";
 import EmptyState from "../../../components/EmptyState";
+import ErrorState from "../../../components/ErrorState";
 
 /**
- * ============================================================================
- * TELA DE LISTAGEM DE ROTAS ESCOLARES (Implementado por: Sammuel — 1º a atuar)
- * ============================================================================
- * Requisitos atendidos:
- * - Listagem consumindo `GET /rotas` via `useRotasQuery` (TanStack Query v5)
- * - Filtro visual por turno (`TODOS`, `MANHA`, `TARDE`) sincronizado com Zustand (`useAppStore`)
- * - Busca textual por nome da rota
- * - Exibição de distância (km), tempo estimado (min) e lotação/capacidade da van
- * - Exclusão (`DELETE /rotas/:id`) com `Dialog` de confirmação e invalidação de cache
- * - FAB (`Floating Action Button`) para criar nova rota
+ * Listagem de Rotas Escolares — Fase 4
+ * - Filtro por turno (Todos | Manhã | Tarde) e busca textual
+ * - Cada card mostra lotação (ocupadas/capacidade)
+ * - Toque no card abre o Detalhe da Rota (`/(tabs)/rotas/detalhe`)
+ * - FAB "+" abre o wizard de Nova Rota (`/(tabs)/rotas/form`)
  */
 export default function RotasListScreen() {
   const router = useRouter();
@@ -48,9 +37,6 @@ export default function RotasListScreen() {
   const setRotaAtiva = useAppStore((state) => state.setRotaAtiva);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [rotaParaExcluir, setRotaParaExcluir] = useState(null);
-
-  const isMotorista = user?.tipo === "MOTORISTA" || !user?.tipo;
 
   const {
     data: rotas = [],
@@ -59,11 +45,8 @@ export default function RotasListScreen() {
     error,
     isRefetching,
     refetch,
-  } = useRotasQuery({ enabled: isMotorista });
+  } = useRotasQuery();
 
-  const deleteRotaMutation = useDeleteRotaMutation();
-
-  // Filtra rotas por turno (Zustand) e pelo texto de busca
   const rotasFiltradas = useMemo(() => {
     const listaSegura = Array.isArray(rotas) ? rotas : [];
     return listaSegura.filter((rota) => {
@@ -80,44 +63,17 @@ export default function RotasListScreen() {
     router.push("/(tabs)/rotas/form");
   };
 
-  const handleOpenEdit = (rota) => {
+  const handleOpenDetalhe = (rota) => {
+    setRotaAtiva(rota);
     router.push({
-      pathname: "/(tabs)/rotas/form",
-      params: {
-        id: rota.id,
-        nome: rota.nome,
-        turno: rota.turno,
-        pontoInicialLat:
-          rota.pontoInicialLat !== null && rota.pontoInicialLat !== undefined
-            ? String(rota.pontoInicialLat)
-            : "",
-        pontoInicialLng:
-          rota.pontoInicialLng !== null && rota.pontoInicialLng !== undefined
-            ? String(rota.pontoInicialLng)
-            : "",
-        pontoFinalLat:
-          rota.pontoFinalLat !== null && rota.pontoFinalLat !== undefined
-            ? String(rota.pontoFinalLat)
-            : "",
-        pontoFinalLng:
-          rota.pontoFinalLng !== null && rota.pontoFinalLng !== undefined
-            ? String(rota.pontoFinalLng)
-            : "",
-        distanciaTotalKm:
-          rota.distanciaTotalKm !== null && rota.distanciaTotalKm !== undefined
-            ? String(rota.distanciaTotalKm)
-            : "",
-        tempoEstimadoMin:
-          rota.tempoEstimadoMin !== null && rota.tempoEstimadoMin !== undefined
-            ? String(rota.tempoEstimadoMin)
-            : "",
-      },
+      pathname: "/(tabs)/rotas/detalhe",
+      params: { id: rota.id },
     });
   };
 
-  const handleViewAlunosDaRota = (rota) => {
+  const handleManageAlunos = (rota) => {
     setRotaAtiva(rota);
-    router.push("/(tabs)/alunos");
+    router.push("/(tabs)/alunos/lotacao");
   };
 
   const handleViewTrajeto = (rota) => {
@@ -128,18 +84,8 @@ export default function RotasListScreen() {
     });
   };
 
-  const handleConfirmDelete = async () => {
-    if (!rotaParaExcluir) return;
-    try {
-      await deleteRotaMutation.mutateAsync(rotaParaExcluir.id);
-    } finally {
-      setRotaParaExcluir(null);
-    }
-  };
-
   return (
     <View style={styles.container}>
-      {/* Painel Superior de Busca e Filtro por Turno */}
       <Surface style={styles.topControls} elevation={1}>
         <Searchbar
           placeholder="Buscar rota por bairro ou colégio..."
@@ -155,17 +101,17 @@ export default function RotasListScreen() {
           buttons={[
             {
               value: "TODOS",
-              label: "Todos",
+              label: "Todas",
               icon: "format-list-bulleted",
             },
             {
               value: "MANHA",
-              label: "Manhã (Ida)",
+              label: "Manhã",
               icon: "weather-sunny",
             },
             {
               value: "TARDE",
-              label: "Tarde (Volta)",
+              label: "Tarde",
               icon: "weather-sunset",
             },
           ]}
@@ -173,32 +119,21 @@ export default function RotasListScreen() {
         />
       </Surface>
 
-      {/* Banner de Erro de Conexão (caso a API esteja offline ou URL não configurada) */}
-      {isError && (
-        <Banner
-          visible
-          icon="cloud-alert"
-          actions={[
-            {
-              label: "Tentar Novamente",
-              onPress: refetch,
-            },
-          ]}
-          style={styles.errorBanner}
-        >
-          {error?.friendlyMessage ||
-            "Erro ao carregar as rotas da API. Verifique sua conexão e a URL configurada."}
-        </Banner>
-      )}
-
-      {/* Conteúdo Principal: Loading ou Lista */}
       {isLoading ? (
         <View style={styles.loadingBox}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text variant="bodyMedium" style={styles.loadingText}>
-            Buscando rotas escolares no servidor...
+            Buscando rotas escolares...
           </Text>
         </View>
+      ) : isError ? (
+        <ErrorState
+          message={
+            error?.friendlyMessage ||
+            "Não foi possível carregar as rotas escolares."
+          }
+          onRetry={refetch}
+        />
       ) : (
         <FlatList
           data={rotasFiltradas}
@@ -215,9 +150,8 @@ export default function RotasListScreen() {
             <RotaCard
               rota={item}
               capacidadePadrao={user?.motorista?.capacidadeVan || 15}
-              onEdit={handleOpenEdit}
-              onDelete={(rota) => setRotaParaExcluir(rota)}
-              onViewAlunos={handleViewAlunosDaRota}
+              onPress={handleOpenDetalhe}
+              onManageAlunos={handleManageAlunos}
               onViewTrajeto={handleViewTrajeto}
             />
           )}
@@ -231,65 +165,21 @@ export default function RotasListScreen() {
                       turnoFiltro === "MANHA" ? "Manhã" : "Tarde"
                     }`
               }
-              description="Cadastre os trajetos de ida (manhã) e volta (tarde) da sua van escolar em Recife para organizar o embarque dos alunos."
-              actionLabel="Cadastrar Nova Rota"
+              description="Cadastre os trajetos de ida (manhã) e volta (tarde) da sua van escolar para organizar o embarque dos alunos."
+              actionLabel="Nova Rota"
               onAction={handleOpenCreate}
             />
           }
         />
       )}
 
-      {/* Botão Flutuante (FAB) para Criar Nova Rota */}
       <FAB
         icon="plus"
         label="Nova Rota"
         style={styles.fab}
-        color={colors.secondary}
+        color={colors.text}
         onPress={handleOpenCreate}
       />
-
-      {/* Modal/Dialog de Confirmação de Exclusão */}
-      <Portal>
-        <Dialog
-          visible={Boolean(rotaParaExcluir)}
-          onDismiss={() => setRotaParaExcluir(null)}
-          style={styles.dialog}
-        >
-          <Dialog.Icon icon="alert-circle-outline" color={colors.error} />
-          <Dialog.Title style={styles.dialogTitle}>
-            Excluir Rota Escolar?
-          </Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyMedium" style={styles.dialogText}>
-              Tem certeza que deseja excluir a rota{" "}
-              <Text style={styles.boldText}>
-                &quot;{rotaParaExcluir?.nome}&quot;
-              </Text>{" "}
-              ({rotaParaExcluir?.turno})? Esta ação removerá o registro no
-              servidor e atualizará a listagem automaticamente.
-            </Text>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button
-              onPress={() => setRotaParaExcluir(null)}
-              disabled={deleteRotaMutation.isPending}
-              textColor={colors.textSecondary}
-            >
-              Cancelar
-            </Button>
-            <Button
-              mode="contained"
-              buttonColor={colors.error}
-              textColor="#FFFFFF"
-              loading={deleteRotaMutation.isPending}
-              disabled={deleteRotaMutation.isPending}
-              onPress={handleConfirmDelete}
-            >
-              Confirmar Exclusão
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
     </View>
   );
 }
@@ -297,12 +187,6 @@ export default function RotasListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
-  },
-  centeredContainer: {
-    flex: 1,
-    padding: 20,
-    justifyContent: "center",
     backgroundColor: colors.background,
   },
   topControls: {
@@ -323,9 +207,6 @@ const styles = StyleSheet.create({
     minHeight: 0,
     fontSize: 14,
   },
-  errorBanner: {
-    backgroundColor: colors.errorLight,
-  },
   loadingBox: {
     flex: 1,
     alignItems: "center",
@@ -345,23 +226,5 @@ const styles = StyleSheet.create({
     bottom: 20,
     backgroundColor: colors.primary,
     borderRadius: 16,
-  },
-  dialog: {
-    backgroundColor: colors.surface,
-    borderRadius: 18,
-  },
-  dialogTitle: {
-    textAlign: "center",
-    fontWeight: "800",
-    color: colors.secondary,
-  },
-  dialogText: {
-    color: colors.text,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  boldText: {
-    fontWeight: "700",
-    color: colors.secondary,
   },
 });

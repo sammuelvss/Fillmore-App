@@ -16,9 +16,12 @@ import {
   HelperText,
   Divider,
   ActivityIndicator,
+  ProgressBar,
 } from "react-native-paper";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { colors } from "../../../theme";
+import { TURNOS } from "../../../constants";
 import {
   useRotaDetailQuery,
   useCreateRotaMutation,
@@ -27,16 +30,10 @@ import {
 import { BAIRROS_RECIFE, geocodificarEndereco } from "../../../utils/geocoding";
 
 /**
- * ============================================================================
- * FORMULÁRIO DE CRIAR / EDITAR ROTA ESCOLAR (Implementado por: Sammuel)
- * ============================================================================
- * Requisitos atendidos:
- * - Criação (`POST /rotas`) e Edição (`PUT /rotas/:id`) com TanStack Query Mutation
- * - Inputs para:
- *   - `nome` (obrigatório)
- *   - `turno` (`SegmentedButtons`: `MANHA` / `TARDE`)
- *   - `pontoInicialLat`, `pontoInicialLng`, `pontoFinalLat`, `pontoFinalLng`
- *   - `distanciaTotalKm` (km) e `tempoEstimadoMin` (min)
+ * Formulário de Rota Escolar em 3 Etapas — Fase 4
+ * Etapa 1: Nome da rota e Turno (Manhã | Tarde)
+ * Etapa 2: Ponto inicial e Ponto final (com presets de bairros de Recife e geocodificação)
+ * Etapa 3: Revisão e botão primário "Salvar rota" (52dp, amarelo com texto escuro)
  */
 export default function RotaFormScreen() {
   const router = useRouter();
@@ -45,6 +42,8 @@ export default function RotaFormScreen() {
 
   const rotaId = params.id ? String(params.id) : null;
   const isEditMode = Boolean(rotaId);
+
+  const [etapa, setEtapa] = useState(1);
 
   const [nome, setNome] = useState(params.nome ? String(params.nome) : "");
   const [turno, setTurno] = useState(
@@ -73,9 +72,8 @@ export default function RotaFormScreen() {
   );
   const [formError, setFormError] = useState("");
 
-  // Caso o usuário abra a tela passando apenas o `id` (ex.: vindo da Home), busca os detalhes da API
   const { data: rotaDetalhe, isLoading: loadingDetalhe } = useRotaDetailQuery(
-    isEditMode && !params.nome ? rotaId : null,
+    isEditMode ? rotaId : null,
   );
 
   useEffect(() => {
@@ -89,38 +87,32 @@ export default function RotaFormScreen() {
       setNome(rotaDetalhe.nome || "");
       setTurno(rotaDetalhe.turno === "TARDE" ? "TARDE" : "MANHA");
       setPontoInicialLat(
-        rotaDetalhe.pontoInicialLat !== null &&
-          rotaDetalhe.pontoInicialLat !== undefined
+        rotaDetalhe.pontoInicialLat != null
           ? String(rotaDetalhe.pontoInicialLat)
           : "",
       );
       setPontoInicialLng(
-        rotaDetalhe.pontoInicialLng !== null &&
-          rotaDetalhe.pontoInicialLng !== undefined
+        rotaDetalhe.pontoInicialLng != null
           ? String(rotaDetalhe.pontoInicialLng)
           : "",
       );
       setPontoFinalLat(
-        rotaDetalhe.pontoFinalLat !== null &&
-          rotaDetalhe.pontoFinalLat !== undefined
+        rotaDetalhe.pontoFinalLat != null
           ? String(rotaDetalhe.pontoFinalLat)
           : "",
       );
       setPontoFinalLng(
-        rotaDetalhe.pontoFinalLng !== null &&
-          rotaDetalhe.pontoFinalLng !== undefined
+        rotaDetalhe.pontoFinalLng != null
           ? String(rotaDetalhe.pontoFinalLng)
           : "",
       );
       setDistanciaTotalKm(
-        rotaDetalhe.distanciaTotalKm !== null &&
-          rotaDetalhe.distanciaTotalKm !== undefined
+        rotaDetalhe.distanciaTotalKm != null
           ? String(rotaDetalhe.distanciaTotalKm)
           : "",
       );
       setTempoEstimadoMin(
-        rotaDetalhe.tempoEstimadoMin !== null &&
-          rotaDetalhe.tempoEstimadoMin !== undefined
+        rotaDetalhe.tempoEstimadoMin != null
           ? String(rotaDetalhe.tempoEstimadoMin)
           : "",
       );
@@ -145,18 +137,17 @@ export default function RotaFormScreen() {
     return Number.isNaN(parsed) ? NaN : parsed;
   };
 
-  const handleSubmit = async () => {
+  const handleNextStep1 = () => {
     setFormError("");
-
-    if (!nome.trim()) {
-      setFormError("O nome da rota é obrigatório.");
+    if (!nome.trim() || nome.trim().length < 3) {
+      setFormError("Informe o nome da rota escolar (mínimo 3 caracteres).");
       return;
     }
+    setEtapa(2);
+  };
 
-    let latIni = parseOptionalFloat(pontoInicialLat);
-    let lngIni = parseOptionalFloat(pontoInicialLng);
-    let latFim = parseOptionalFloat(pontoFinalLat);
-    let lngFim = parseOptionalFloat(pontoFinalLng);
+  const handleNextStep2 = async () => {
+    setFormError("");
     const distKm = parseOptionalFloat(distanciaTotalKm);
     const tempoMin = parseOptionalInt(tempoEstimadoMin);
 
@@ -164,7 +155,6 @@ export default function RotaFormScreen() {
       setFormError("Informe uma distância em km válida (ex.: 12.5).");
       return;
     }
-
     if (Number.isNaN(tempoMin) || (tempoMin !== null && tempoMin < 0)) {
       setFormError("Informe um tempo estimado em minutos válido (ex.: 45).");
       return;
@@ -176,21 +166,34 @@ export default function RotaFormScreen() {
         if (localPartida.trim()) {
           const geoIni = await geocodificarEndereco(localPartida);
           if (geoIni) {
-            latIni = geoIni.latitude;
-            lngIni = geoIni.longitude;
+            setPontoInicialLat(String(geoIni.latitude));
+            setPontoInicialLng(String(geoIni.longitude));
           }
         }
         if (localDestino.trim()) {
           const geoFim = await geocodificarEndereco(localDestino);
           if (geoFim) {
-            latFim = geoFim.latitude;
-            lngFim = geoFim.longitude;
+            setPontoFinalLat(String(geoFim.latitude));
+            setPontoFinalLng(String(geoFim.longitude));
           }
         }
       } finally {
         setGeocodificando(false);
       }
     }
+
+    setEtapa(3);
+  };
+
+  const handleSubmit = async () => {
+    setFormError("");
+
+    const latIni = parseOptionalFloat(pontoInicialLat);
+    const lngIni = parseOptionalFloat(pontoInicialLng);
+    const latFim = parseOptionalFloat(pontoFinalLat);
+    const lngFim = parseOptionalFloat(pontoFinalLng);
+    const distKm = parseOptionalFloat(distanciaTotalKm);
+    const tempoMin = parseOptionalInt(tempoEstimadoMin);
 
     const payload = {
       nome: nome.trim(),
@@ -199,8 +202,8 @@ export default function RotaFormScreen() {
       pontoInicialLng: Number.isNaN(lngIni) ? null : lngIni,
       pontoFinalLat: Number.isNaN(latFim) ? null : latFim,
       pontoFinalLng: Number.isNaN(lngFim) ? null : lngFim,
-      distanciaTotalKm: distKm,
-      tempoEstimadoMin: tempoMin,
+      distanciaTotalKm: Number.isNaN(distKm) ? null : distKm,
+      tempoEstimadoMin: Number.isNaN(tempoMin) ? null : tempoMin,
     };
 
     try {
@@ -228,6 +231,8 @@ export default function RotaFormScreen() {
     );
   }
 
+  const turnoInfo = TURNOS[turno] || TURNOS.MANHA;
+
   return (
     <KeyboardAvoidingView
       style={styles.keyboardView}
@@ -237,166 +242,380 @@ export default function RotaFormScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Card Principal do Formulário */}
-        <Surface style={styles.formCard} elevation={1}>
-          <Text variant="titleMedium" style={styles.sectionTitle}>
-            1. Identificação e Turno da Viagem
-          </Text>
-
-          <TextInput
-            label="Nome da Rota Escolar *"
-            placeholder="Ex.: Rota Boa Viagem → Colégios Derby"
-            mode="outlined"
-            value={nome}
-            onChangeText={setNome}
-            left={<TextInput.Icon icon="routes" />}
-            style={styles.input}
-          />
-
-          <Text variant="labelLarge" style={styles.fieldLabel}>
-            Turno da Rota *
-          </Text>
-          <SegmentedButtons
-            value={turno}
-            onValueChange={setTurno}
-            buttons={[
-              {
-                value: "MANHA",
-                label: "Manhã (Ida)",
-                icon: "weather-sunny",
-              },
-              {
-                value: "TARDE",
-                label: "Tarde (Volta)",
-                icon: "weather-sunset",
-              },
-            ]}
-            style={styles.segmented}
-          />
-
-          <Divider style={styles.divider} />
-
-          <Text variant="titleMedium" style={styles.sectionTitle}>
-            2. Distância e Tempo Estimado
-          </Text>
-
-          <View style={styles.row}>
-            <TextInput
-              label="Distância Total (km)"
-              placeholder="Ex.: 12.5"
-              mode="outlined"
-              keyboardType="decimal-pad"
-              value={distanciaTotalKm}
-              onChangeText={setDistanciaTotalKm}
-              left={<TextInput.Icon icon="map-marker-distance" />}
-              style={[styles.input, styles.halfInput]}
-            />
-
-            <TextInput
-              label="Tempo Estimado (min)"
-              placeholder="Ex.: 45"
-              mode="outlined"
-              keyboardType="numeric"
-              value={tempoEstimadoMin}
-              onChangeText={setTempoEstimadoMin}
-              left={<TextInput.Icon icon="clock-outline" />}
-              style={[styles.input, styles.halfInput]}
-            />
+        {/* Cabeçalho de Progresso */}
+        <Surface style={styles.stepHeaderCard} elevation={1}>
+          <View style={styles.stepHeaderTop}>
+            <Text variant="labelLarge" style={styles.stepTag}>
+              ETAPA {etapa} DE 3
+            </Text>
+            <Text variant="bodySmall" style={styles.stepSubtitle}>
+              {etapa === 1
+                ? "Nome e Turno"
+                : etapa === 2
+                  ? "Pontos Inicial e Final"
+                  : "Revisão da Rota"}
+            </Text>
           </View>
-
-          <Divider style={styles.divider} />
-
-          <Text variant="titleMedium" style={styles.sectionTitle}>
-            3. Locais de Partida e Destino (Opcional)
-          </Text>
-          <Text variant="bodySmall" style={styles.coordHelper}>
-            Informe o bairro ou endereço para posicionar a rota no mapa automaticamente.
-          </Text>
-
-          <TextInput
-            label="Local ou Bairro de Partida"
-            placeholder="Ex.: Boa Viagem ou Av. Conselheiro Aguiar"
-            mode="outlined"
-            value={localPartida}
-            onChangeText={setLocalPartida}
-            left={<TextInput.Icon icon="map-marker-outline" />}
-            style={styles.input}
+          <ProgressBar
+            progress={etapa / 3}
+            color={colors.primary}
+            style={styles.progressBar}
           />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.bairrosRow}
-          >
-            {BAIRROS_RECIFE.map((b) => (
-              <Chip
-                key={`ini-${b.label}`}
-                compact
-                selected={localPartida === b.label}
-                onPress={() => setLocalPartida(b.label)}
-                style={styles.bairroChip}
-              >
-                {b.label}
-              </Chip>
-            ))}
-          </ScrollView>
+        </Surface>
 
-          <TextInput
-            label="Local ou Escola de Destino"
-            placeholder="Ex.: Colégio Santa Maria ou Derby"
-            mode="outlined"
-            value={localDestino}
-            onChangeText={setLocalDestino}
-            left={<TextInput.Icon icon="flag-checkered" />}
-            style={styles.input}
-          />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.bairrosRow}
-          >
-            {BAIRROS_RECIFE.map((b) => (
-              <Chip
-                key={`fim-${b.label}`}
-                compact
-                selected={localDestino === b.label}
-                onPress={() => setLocalDestino(b.label)}
-                style={styles.bairroChip}
-              >
-                {b.label}
-              </Chip>
-            ))}
-          </ScrollView>
+        <Surface style={styles.formCard} elevation={1}>
+          {etapa === 1 ? (
+            <>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                1. Nome e Turno da Rota
+              </Text>
+              <Text variant="bodySmall" style={styles.helperCopy}>
+                Dê um nome fácil de reconhecer pelo bairro ou escola atendida.
+              </Text>
 
-          {formError ? (
-            <HelperText type="error" visible style={styles.errorText}>
-              {formError}
-            </HelperText>
+              <TextInput
+                label="Nome da Rota Escolar *"
+                placeholder="Ex.: Rota Boa Viagem → Colégio Santa Maria"
+                mode="outlined"
+                value={nome}
+                onChangeText={(v) => {
+                  setNome(v);
+                  if (formError) setFormError("");
+                }}
+                left={<TextInput.Icon icon="routes" />}
+                style={styles.input}
+              />
+
+              <Text variant="labelLarge" style={styles.fieldLabel}>
+                Turno da Viagem *
+              </Text>
+              <SegmentedButtons
+                value={turno}
+                onValueChange={setTurno}
+                buttons={[
+                  {
+                    value: "MANHA",
+                    label: "Manhã (Ida)",
+                    icon: "weather-sunny",
+                  },
+                  {
+                    value: "TARDE",
+                    label: "Tarde (Volta)",
+                    icon: "weather-sunset",
+                  },
+                ]}
+                style={styles.segmented}
+              />
+
+              {formError ? (
+                <HelperText type="error" visible style={styles.errorText}>
+                  {formError}
+                </HelperText>
+              ) : null}
+
+              <View style={styles.actionsRow}>
+                <Button
+                  mode="outlined"
+                  onPress={() => router.back()}
+                  style={styles.backBtn}
+                  contentStyle={styles.secondaryBtnContent}
+                  textColor={colors.secondary}
+                >
+                  Cancelar
+                </Button>
+
+                <Button
+                  mode="contained"
+                  icon="arrow-right"
+                  contentStyle={[
+                    styles.primaryBtnContent,
+                    { flexDirection: "row-reverse" },
+                  ]}
+                  style={styles.primaryBtn}
+                  buttonColor={colors.primary}
+                  textColor={colors.text}
+                  labelStyle={styles.primaryBtnLabel}
+                  onPress={handleNextStep1}
+                >
+                  Continuar
+                </Button>
+              </View>
+            </>
           ) : null}
 
-          <View style={styles.actionsRow}>
-            <Button
-              mode="outlined"
-              onPress={() => router.back()}
-              disabled={isSubmitting}
-              style={styles.cancelBtn}
-              textColor={colors.secondary}
-            >
-              Cancelar
-            </Button>
+          {etapa === 2 ? (
+            <>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                2. Pontos Inicial e Final
+              </Text>
+              <Text variant="bodySmall" style={styles.helperCopy}>
+                Escolha um bairro de Recife ou digite o endereço para calcular
+                as coordenadas no mapa automaticamente.
+              </Text>
 
-            <Button
-              mode="contained"
-              icon={isEditMode ? "content-save-edit" : "check-bold"}
-              onPress={handleSubmit}
-              loading={isSubmitting}
-              disabled={isSubmitting}
-              style={styles.submitBtn}
-              buttonColor={colors.primary}
-              textColor={colors.secondary}
-            >
-              {isEditMode ? "Salvar Alterações" : "Criar Rota"}
-            </Button>
-          </View>
+              <TextInput
+                label="Ponto Inicial (Bairro ou Endereço)"
+                placeholder="Ex.: Boa Viagem ou Av. Conselheiro Aguiar"
+                mode="outlined"
+                value={localPartida}
+                onChangeText={setLocalPartida}
+                left={<TextInput.Icon icon="map-marker-outline" />}
+                style={styles.input}
+              />
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.bairrosRow}
+              >
+                {BAIRROS_RECIFE.map((b) => (
+                  <Chip
+                    key={`ini-${b.label}`}
+                    compact
+                    selected={localPartida === b.label}
+                    onPress={() => {
+                      setLocalPartida(b.label);
+                      setPontoInicialLat(String(b.lat));
+                      setPontoInicialLng(String(b.lng));
+                    }}
+                    style={styles.bairroChip}
+                  >
+                    {b.label}
+                  </Chip>
+                ))}
+              </ScrollView>
+
+              <TextInput
+                label="Ponto Final / Escola de Destino"
+                placeholder="Ex.: Colégio Santa Maria ou Derby"
+                mode="outlined"
+                value={localDestino}
+                onChangeText={setLocalDestino}
+                left={<TextInput.Icon icon="flag-checkered" />}
+                style={styles.input}
+              />
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.bairrosRow}
+              >
+                {BAIRROS_RECIFE.map((b) => (
+                  <Chip
+                    key={`fim-${b.label}`}
+                    compact
+                    selected={localDestino === b.label}
+                    onPress={() => {
+                      setLocalDestino(b.label);
+                      setPontoFinalLat(String(b.lat));
+                      setPontoFinalLng(String(b.lng));
+                    }}
+                    style={styles.bairroChip}
+                  >
+                    {b.label}
+                  </Chip>
+                ))}
+              </ScrollView>
+
+              <Divider style={styles.divider} />
+
+              <Text variant="labelLarge" style={styles.fieldLabel}>
+                Estimativa Manual (opcional)
+              </Text>
+              <View style={styles.row}>
+                <TextInput
+                  label="Distância (km)"
+                  placeholder="Ex.: 12.5"
+                  mode="outlined"
+                  keyboardType="decimal-pad"
+                  value={distanciaTotalKm}
+                  onChangeText={setDistanciaTotalKm}
+                  left={<TextInput.Icon icon="map-marker-distance" />}
+                  style={[styles.input, styles.halfInput]}
+                />
+
+                <TextInput
+                  label="Tempo (min)"
+                  placeholder="Ex.: 45"
+                  mode="outlined"
+                  keyboardType="numeric"
+                  value={tempoEstimadoMin}
+                  onChangeText={setTempoEstimadoMin}
+                  left={<TextInput.Icon icon="clock-outline" />}
+                  style={[styles.input, styles.halfInput]}
+                />
+              </View>
+
+              {formError ? (
+                <HelperText type="error" visible style={styles.errorText}>
+                  {formError}
+                </HelperText>
+              ) : null}
+
+              <View style={styles.actionsRow}>
+                <Button
+                  mode="outlined"
+                  icon="arrow-left"
+                  onPress={() => setEtapa(1)}
+                  disabled={geocodificando}
+                  style={styles.backBtn}
+                  contentStyle={styles.secondaryBtnContent}
+                  textColor={colors.secondary}
+                >
+                  Voltar
+                </Button>
+
+                <Button
+                  mode="contained"
+                  icon="arrow-right"
+                  loading={geocodificando}
+                  disabled={geocodificando}
+                  contentStyle={[
+                    styles.primaryBtnContent,
+                    { flexDirection: "row-reverse" },
+                  ]}
+                  style={styles.primaryBtn}
+                  buttonColor={colors.primary}
+                  textColor={colors.text}
+                  labelStyle={styles.primaryBtnLabel}
+                  onPress={handleNextStep2}
+                >
+                  Revisar
+                </Button>
+              </View>
+            </>
+          ) : null}
+
+          {etapa === 3 ? (
+            <>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                3. Revisão da Rota
+              </Text>
+              <Text variant="bodySmall" style={styles.helperCopy}>
+                Confira os dados antes de salvar a rota escolar.
+              </Text>
+
+              <View style={styles.reviewBox}>
+                <View style={styles.reviewRow}>
+                  <MaterialCommunityIcons
+                    name="bus-school"
+                    size={20}
+                    color={colors.primaryDark}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="labelSmall" style={styles.reviewLabel}>
+                      NOME DA ROTA
+                    </Text>
+                    <Text variant="titleMedium" style={styles.reviewValue}>
+                      {nome.trim()}
+                    </Text>
+                  </View>
+                </View>
+
+                <Divider style={styles.reviewDivider} />
+
+                <View style={styles.reviewRow}>
+                  <MaterialCommunityIcons
+                    name={turnoInfo.icon}
+                    size={20}
+                    color={colors.secondary}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="labelSmall" style={styles.reviewLabel}>
+                      TURNO
+                    </Text>
+                    <Text variant="bodyLarge" style={styles.reviewValue}>
+                      {turnoInfo.label}
+                    </Text>
+                  </View>
+                </View>
+
+                <Divider style={styles.reviewDivider} />
+
+                <View style={styles.reviewRow}>
+                  <MaterialCommunityIcons
+                    name="map-marker-path"
+                    size={20}
+                    color={colors.success}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="labelSmall" style={styles.reviewLabel}>
+                      PONTOS DE PARTIDA E DESTINO
+                    </Text>
+                    <Text variant="bodyMedium" style={styles.reviewValue}>
+                      Partida:{" "}
+                      {localPartida.trim() ||
+                        (pontoInicialLat
+                          ? `GPS (${Number(pontoInicialLat).toFixed(4)}, ${Number(pontoInicialLng).toFixed(4)})`
+                          : "Automático pelos alunos")}
+                    </Text>
+                    <Text variant="bodyMedium" style={styles.reviewValue}>
+                      Destino:{" "}
+                      {localDestino.trim() ||
+                        (pontoFinalLat
+                          ? `GPS (${Number(pontoFinalLat).toFixed(4)}, ${Number(pontoFinalLng).toFixed(4)})`
+                          : "Automático pelos alunos")}
+                    </Text>
+                  </View>
+                </View>
+
+                {(distanciaTotalKm || tempoEstimadoMin) && (
+                  <>
+                    <Divider style={styles.reviewDivider} />
+                    <View style={styles.reviewRow}>
+                      <MaterialCommunityIcons
+                        name="clock-fast"
+                        size={20}
+                        color={colors.info}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text variant="labelSmall" style={styles.reviewLabel}>
+                          ESTIMATIVA
+                        </Text>
+                        <Text variant="bodyMedium" style={styles.reviewValue}>
+                          {distanciaTotalKm ? `${distanciaTotalKm} km` : "—"}{" "}
+                          • {tempoEstimadoMin ? `${tempoEstimadoMin} min` : "—"}
+                        </Text>
+                      </View>
+                    </View>
+                  </>
+                )}
+              </View>
+
+              {formError ? (
+                <HelperText type="error" visible style={styles.errorText}>
+                  {formError}
+                </HelperText>
+              ) : null}
+
+              <View style={styles.actionsRow}>
+                <Button
+                  mode="outlined"
+                  icon="arrow-left"
+                  onPress={() => setEtapa(2)}
+                  disabled={isSubmitting}
+                  style={styles.backBtn}
+                  contentStyle={styles.secondaryBtnContent}
+                  textColor={colors.secondary}
+                >
+                  Voltar
+                </Button>
+
+                <Button
+                  mode="contained"
+                  icon="check-bold"
+                  onPress={handleSubmit}
+                  loading={isSubmitting}
+                  disabled={isSubmitting}
+                  style={styles.primaryBtn}
+                  contentStyle={styles.primaryBtnContent}
+                  buttonColor={colors.primary}
+                  textColor={colors.text}
+                  labelStyle={styles.primaryBtnLabel}
+                >
+                  Salvar rota
+                </Button>
+              </View>
+            </>
+          ) : null}
         </Surface>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -411,6 +630,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 40,
+    gap: 14,
   },
   loadingContainer: {
     flex: 1,
@@ -420,6 +640,32 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: colors.textSecondary,
+  },
+  stepHeaderCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 8,
+  },
+  stepHeaderTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  stepTag: {
+    fontWeight: "800",
+    color: colors.primaryDark,
+  },
+  stepSubtitle: {
+    fontWeight: "700",
+    color: colors.secondary,
+  },
+  progressBar: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.surfaceVariant,
   },
   formCard: {
     backgroundColor: colors.surface,
@@ -431,7 +677,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontWeight: "800",
     color: colors.secondary,
-    marginBottom: 12,
+    marginBottom: 4,
+  },
+  helperCopy: {
+    color: colors.textSecondary,
+    marginBottom: 14,
+    lineHeight: 18,
   },
   fieldLabel: {
     color: colors.secondary,
@@ -443,7 +694,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   segmented: {
-    marginBottom: 8,
+    marginBottom: 12,
   },
   divider: {
     marginVertical: 14,
@@ -455,22 +706,37 @@ const styles = StyleSheet.create({
   halfInput: {
     flex: 1,
   },
-  coordHelper: {
-    color: colors.textSecondary,
-    marginTop: -6,
-    marginBottom: 12,
-  },
   bairrosRow: {
     gap: 6,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   bairroChip: {
     backgroundColor: colors.surfaceVariant,
   },
-  subLabel: {
+  reviewBox: {
+    backgroundColor: colors.background,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: 12,
+  },
+  reviewRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  reviewLabel: {
+    color: colors.textSecondary,
+    fontWeight: "700",
+  },
+  reviewValue: {
     color: colors.secondary,
     fontWeight: "700",
-    marginBottom: 6,
+    marginTop: 2,
+  },
+  reviewDivider: {
+    marginVertical: 10,
   },
   errorText: {
     fontWeight: "700",
@@ -478,16 +744,26 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     flexDirection: "row",
-    justifyContent: "flex-end",
+    alignItems: "center",
     gap: 10,
     marginTop: 12,
   },
-  cancelBtn: {
-    borderRadius: 10,
+  backBtn: {
+    borderRadius: 12,
     borderColor: colors.border,
   },
-  submitBtn: {
-    borderRadius: 10,
+  secondaryBtnContent: {
+    minHeight: 48,
+  },
+  primaryBtn: {
     flex: 1,
+    borderRadius: 12,
+  },
+  primaryBtnContent: {
+    height: 52,
+  },
+  primaryBtnLabel: {
+    fontWeight: "800",
+    fontSize: 15,
   },
 });

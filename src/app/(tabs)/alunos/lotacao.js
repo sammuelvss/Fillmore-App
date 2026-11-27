@@ -112,6 +112,15 @@ export default function LotacaoRotaScreen() {
 
   const handleVincularAluno = async (aluno) => {
     if (!rotaSelecionada) return;
+    if (isLotada) {
+      setPickerVisible(false);
+      setLotacaoConflito({
+        message: `A van já atingiu a capacidade máxima (${vagasOcupadas}/${capacidadeMaxima} vagas) nesta rota. Desvincule um passageiro ou aumente a capacidade no Perfil.`,
+        rota: rotaSelecionada,
+        aluno,
+      });
+      return;
+    }
     const tipoTrajeto = rotaSelecionada.turno === "TARDE" ? "VOLTA" : "IDA";
     try {
       await vincularMutation.mutateAsync({
@@ -388,12 +397,12 @@ export default function LotacaoRotaScreen() {
                         mode="contained"
                         compact
                         buttonColor={colors.primary}
-                        textColor={colors.secondary}
+                        textColor={colors.text}
                         loading={vincularMutation.isPending}
-                        disabled={vincularMutation.isPending}
+                        disabled={vincularMutation.isPending || isLotada}
                         onPress={() => handleVincularAluno(aluno)}
                       >
-                        Vincular
+                        {isLotada ? "Lotada" : "Vincular"}
                       </Button>
                     </View>
                     {idx < alunosDisponiveis.length - 1 && <Divider />}

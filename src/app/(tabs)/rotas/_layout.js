@@ -38,6 +38,13 @@ export default function RotasStackLayout() {
         }}
       />
       <Stack.Screen
+        name="detalhe"
+        options={{
+          title: "Detalhe da Rota",
+          presentation: "card",
+        }}
+      />
+      <Stack.Screen
         name="form"
         options={{
           title: "Gerenciar Rota",
@@ -47,7 +54,7 @@ export default function RotasStackLayout() {
       <Stack.Screen
         name="trajeto"
         options={{
-          title: "Rota Inteligente",
+          title: "Trajeto do Dia",
           presentation: "card",
         }}
       />

@@ -7,6 +7,7 @@ import {
   HelperText,
   Portal,
   SegmentedButtons,
+  Surface,
   Text,
   TextInput,
 } from "react-native-paper";
@@ -16,7 +17,8 @@ import { useVincularAlunoRotaMutation } from "../../hooks/useAlunos";
 
 /**
  * Modal/Dialog para vincular um aluno a uma rota escolar (`POST /rotas/:rotaId/alunos`).
- * Trata explicitamente o erro HTTP 409 (capacidade máxima da van atingida).
+ * Mostra a ocupação antes do vínculo (ex.: 14/15) e bloqueia proativamente se a van estiver lotada,
+ * mantendo o tratamento de HTTP 409 como rede de segurança.
  */
 export default function VincularRotaDialog({
   visible,
@@ -39,6 +41,15 @@ export default function VincularRotaDialog({
     [rotas, rotaId],
   );
 
+  const getOcupacaoRota = (rota) => {
+    if (!rota) return { ocupadas: 0, max: capacidadePadrao || 15, lotada: false };
+    const lista =
+      rota.turno === "TARDE" ? rota.alunosVolta || [] : rota.alunosIda || [];
+    const ocupadas = Array.isArray(lista) ? lista.length : 0;
+    const max = rota.motorista?.capacidadeVan || capacidadePadrao || 15;
+    return { ocupadas, max, lotada: ocupadas >= max };
+  };
+
   useEffect(() => {
     if (!visible) return;
     setLocalError("");
@@ -50,11 +61,8 @@ export default function VincularRotaDialog({
       setRotaId(inicial.id);
       const trajetoPadrao = inicial.turno === "TARDE" ? "VOLTA" : "IDA";
       setTipoTrajeto(trajetoPadrao);
-      const ocupados =
-        inicial.turno === "TARDE"
-          ? inicial.alunosVolta?.length || 0
-          : inicial.alunosIda?.length || 0;
-      setOrdemNaRota(String(ocupados + 1));
+      const { ocupadas } = getOcupacaoRota(inicial);
+      setOrdemNaRota(String(ocupadas + 1));
     } else {
       setRotaId("");
       setOrdemNaRota("1");
@@ -65,16 +73,22 @@ export default function VincularRotaDialog({
     setRotaId(rota.id);
     setLocalError("");
     setTipoTrajeto(rota.turno === "TARDE" ? "VOLTA" : "IDA");
-    const ocupados =
-      rota.turno === "TARDE"
-        ? rota.alunosVolta?.length || 0
-        : rota.alunosIda?.length || 0;
-    setOrdemNaRota(String(ocupados + 1));
+    const { ocupadas } = getOcupacaoRota(rota);
+    setOrdemNaRota(String(ocupadas + 1));
   };
+
+  const ocupacaoAtual = getOcupacaoRota(rotaSelecionada);
 
   const handleConfirm = async () => {
     if (!aluno?.id || !rotaId) {
       setLocalError("Selecione uma rota para vincular o aluno.");
+      return;
+    }
+
+    if (ocupacaoAtual.lotada) {
+      setLocalError(
+        `A van já está lotada nesta rota (${ocupacaoAtual.ocupadas}/${ocupacaoAtual.max} vagas). Desvincule um passageiro ou aumente a capacidade da van no Perfil.`,
+      );
       return;
     }
 
@@ -118,21 +132,9 @@ export default function VincularRotaDialog({
     }
   };
 
-  const getOcupacaoRota = (rota) => {
-    const lista =
-      rota.turno === "TARDE" ? rota.alunosVolta || [] : rota.alunosIda || [];
-    const ocupadas = Array.isArray(lista) ? lista.length : 0;
-    const max = rota.motorista?.capacidadeVan || capacidadePadrao || 15;
-    return { ocupadas, max, lotada: ocupadas >= max };
-  };
-
   return (
     <Portal>
-      <Dialog
-        visible={visible}
-        onDismiss={onDismiss}
-        style={styles.dialog}
-      >
+      <Dialog visible={visible} onDismiss={onDismiss} style={styles.dialog}>
         <Dialog.Title style={styles.title}>Vincular Aluno à Rota</Dialog.Title>
         <Dialog.Content>
           <Text variant="bodyMedium" style={styles.alunoHeader}>
@@ -155,7 +157,7 @@ export default function VincularRotaDialog({
           ) : (
             <>
               <Text variant="labelMedium" style={styles.label}>
-                Escolha a Rota Escolar:
+                Escolha a Rota Escolar (ocupação exibida):
               </Text>
               <ScrollView
                 style={styles.rotasScroll}
@@ -186,13 +188,46 @@ export default function VincularRotaDialog({
                           selected && styles.rotaChipTextSelected,
                         ]}
                       >
-                        {r.nome} ({r.turno}) • {ocupadas}/{max}
-                        {lotada ? " LOTADA" : ""}
+                        {r.nome} ({r.turno === "MANHA" ? "Manhã" : "Tarde"}) •{" "}
+                        {ocupadas}/{max}
+                        {lotada ? " (LOTADA)" : ""}
                       </Chip>
                     );
                   })}
                 </View>
               </ScrollView>
+
+              {rotaSelecionada ? (
+                <Surface
+                  style={[
+                    styles.capacityNotice,
+                    ocupacaoAtual.lotada
+                      ? styles.capacityNoticeFull
+                      : styles.capacityNoticeOpen,
+                  ]}
+                  elevation={0}
+                >
+                  <MaterialCommunityIcons
+                    name={
+                      ocupacaoAtual.lotada ? "bus-alert" : "seat-passenger"
+                    }
+                    size={18}
+                    color={ocupacaoAtual.lotada ? "#991B1B" : "#166534"}
+                  />
+                  <Text
+                    variant="labelMedium"
+                    style={{
+                      flex: 1,
+                      fontWeight: "700",
+                      color: ocupacaoAtual.lotada ? "#991B1B" : "#166534",
+                    }}
+                  >
+                    {ocupacaoAtual.lotada
+                      ? `Van lotada (${ocupacaoAtual.ocupadas}/${ocupacaoAtual.max} vagas). Não é possível vincular mais alunos nesta rota.`
+                      : `Ocupação atual: ${ocupacaoAtual.ocupadas}/${ocupacaoAtual.max} vagas (${ocupacaoAtual.max - ocupacaoAtual.ocupadas} disponíveis).`}
+                  </Text>
+                </Surface>
+              ) : null}
 
               <Text variant="labelMedium" style={styles.label}>
                 Tipo de Trajeto:
@@ -238,9 +273,13 @@ export default function VincularRotaDialog({
           <Button
             mode="contained"
             buttonColor={colors.primary}
-            textColor={colors.secondary}
+            textColor={colors.text}
             loading={vincularMutation.isPending}
-            disabled={vincularMutation.isPending || rotas.length === 0}
+            disabled={
+              vincularMutation.isPending ||
+              rotas.length === 0 ||
+              ocupacaoAtual.lotada
+            }
             onPress={handleConfirm}
           >
             Vincular
@@ -302,6 +341,20 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.secondary,
   },
+  capacityNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  capacityNoticeOpen: {
+    backgroundColor: "#DCFCE7",
+  },
+  capacityNoticeFull: {
+    backgroundColor: "#FEE2E2",
+  },
   segmented: {
     marginBottom: 12,
   },
@@ -318,7 +371,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     flex: 1,
-    color: "#92400E",
+    color: "#9A3412",
   },
   errorText: {
     fontWeight: "700",

@@ -33,8 +33,15 @@ export default function AlunosStackLayout() {
       <Stack.Screen
         name="index"
         options={{
-          title: "Alunos & Lotação",
+          title: "Alunos",
           headerRight: renderPerfilButton,
+        }}
+      />
+      <Stack.Screen
+        name="detalhe"
+        options={{
+          title: "Detalhe do Aluno",
+          presentation: "card",
         }}
       />
       <Stack.Screen
