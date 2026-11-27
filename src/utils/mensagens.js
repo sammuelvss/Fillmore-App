@@ -7,7 +7,7 @@ export const primeiroNome = (nomeCompleto) =>
     .trim()
     .split(/\s+/)[0];
 
-// Monta link HTTPS clicável no WhatsApp que abre a página web de cancelamento do responsável no navegador do celular (sem instalar o app)
+// Monta link HTTPS clicável no WhatsApp (GitHub Pages oficial do repositório) que abre a página web de cancelamento do responsável no navegador do celular (sem instalar o app)
 export const montarLinkCancelamentoWeb = ({
   alunoId,
   alunoNome,
@@ -16,9 +16,7 @@ export const montarLinkCancelamentoWeb = ({
   if (!alunoId) return "";
   const nomeCurto = encodeURIComponent(primeiroNome(alunoNome));
   const turnoLimpo = encodeURIComponent(String(turno || "MANHA").toUpperCase());
-  const rawHtmlUrl =
-    "https://raw.githubusercontent.com/sammuelvss/Fillmore-App/feat/redesign-motorista-v2/public/cancelar.html";
-  return `https://htmlpreview.github.io/?${rawHtmlUrl}#a=${encodeURIComponent(String(alunoId))}&n=${nomeCurto}&t=${turnoLimpo}`;
+  return `https://sammuelvss.github.io/Fillmore-App/cancelar.html?a=${encodeURIComponent(String(alunoId))}&n=${nomeCurto}&t=${turnoLimpo}`;
 };
 
 export const mensagemVanChegando = ({
