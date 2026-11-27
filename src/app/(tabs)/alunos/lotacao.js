@@ -542,7 +542,7 @@ const styles = StyleSheet.create({
     color: colors.secondary,
   },
   statusChip: {
-    height: 26,
+    borderRadius: 8,
   },
   statusChipOpen: {
     backgroundColor: "#DCFCE7",

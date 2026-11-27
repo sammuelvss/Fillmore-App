@@ -106,12 +106,16 @@ export default function SobreScreen() {
           Gestão Inteligente de Transporte Escolar Informal em Recife/PE
         </Text>
         <View style={styles.tagsRow}>
-          <Chip compact style={styles.tagChip} textStyle={styles.tagChipText}>
-            UNICAP 2026.2
-          </Chip>
-          <Chip compact style={styles.tagChip} textStyle={styles.tagChipText}>
-            App do Motorista
-          </Chip>
+          <View style={styles.tagBadge}>
+            <Text variant="labelSmall" style={styles.tagChipText}>
+              UNICAP 2026.2
+            </Text>
+          </View>
+          <View style={styles.tagBadge}>
+            <Text variant="labelSmall" style={styles.tagChipText}>
+              App do Motorista
+            </Text>
+          </View>
         </View>
       </Surface>
 
@@ -170,13 +174,11 @@ export default function SobreScreen() {
                     <Text variant="titleSmall" style={styles.memberName}>
                       {membro.nome}
                     </Text>
-                    <Chip
-                      compact
-                      style={styles.orderChip}
-                      textStyle={styles.orderChipText}
-                    >
-                      {membro.ordem}
-                    </Chip>
+                    <View style={styles.orderBadge}>
+                      <Text variant="labelSmall" style={styles.orderChipText}>
+                        {membro.ordem}
+                      </Text>
+                    </View>
                   </View>
                   <Text variant="labelSmall" style={styles.memberRa}>
                     {membro.ra}
@@ -268,10 +270,15 @@ const styles = StyleSheet.create({
   },
   tagsRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
     gap: 8,
   },
-  tagChip: {
+  tagBadge: {
     backgroundColor: "#334155",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
   },
   tagChipText: {
     color: colors.primaryAccent,
@@ -319,15 +326,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 2,
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 4,
   },
   memberName: {
     fontWeight: "800",
     color: colors.secondary,
   },
-  orderChip: {
+  orderBadge: {
     backgroundColor: colors.surfaceVariant,
-    height: 24,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   orderChipText: {
     fontSize: 12,
