@@ -17,6 +17,7 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import EmptyState from "../../../components/EmptyState";
+import ErrorState from "../../../components/ErrorState";
 import MapaTrajeto from "../../../components/rotas/MapaTrajeto";
 import {
   TURNO_LABELS,
@@ -36,8 +37,11 @@ import { colors } from "../../../theme";
 
 const adicionarDiasISO = (iso, delta) => {
   const [ano, mes, dia] = iso.split("-").map(Number);
-  const dt = new Date(Date.UTC(ano, mes - 1, dia + delta));
-  return dt.toISOString().slice(0, 10);
+  const dt = new Date(ano, mes - 1, dia + delta);
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
+  const d = String(dt.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 };
 
 const extrairDigitos = (telefone) => String(telefone || "").replace(/\D/g, "");
@@ -228,15 +232,12 @@ export default function TrajetoRotaScreen() {
   if (isError && !trajeto) {
     return (
       <View style={styles.container}>
-        <EmptyState
-          icon="alert-circle-outline"
-          title="Erro ao carregar o trajeto"
-          description={
+        <ErrorState
+          message={
             error?.friendlyMessage ||
             "Não foi possível obter a rota otimizada no momento."
           }
-          actionLabel="Tentar novamente"
-          onAction={refetch}
+          onRetry={refetch}
         />
       </View>
     );
@@ -362,6 +363,8 @@ export default function TrajetoRotaScreen() {
             buttonColor={colors.primary}
             textColor="#0F172A"
             style={styles.recalcularBtn}
+            contentStyle={{ height: 52 }}
+            labelStyle={{ fontWeight: "800", fontSize: 15 }}
           >
             Recalcular Melhor Rota
           </Button>
