@@ -36,11 +36,13 @@ import { signUpRequest } from "../../../api/authApi";
 import { useAppStore } from "../../../store/useAppStore";
 import {
   ALUNOS_KEYS,
+  registrarResponsavelDoMotoristaLocal,
   useAlunoDetailQuery,
   useCreateAlunoMutation,
   useResponsaveisQuery,
   useUpdateAlunoMutation,
 } from "../../../hooks/useAlunos";
+import { useAuthStore } from "../../../store/useAuthStore";
 import { geocodificarEndereco } from "../../../utils/geocoding";
 
 /**
@@ -56,6 +58,7 @@ export default function AlunoFormScreen() {
   const params = useLocalSearchParams();
   const queryClient = useQueryClient();
   const showSnackbar = useAppStore((state) => state.showSnackbar);
+  const userId = useAuthStore((state) => state.user?.id);
 
   const alunoId = params.id
     ? Array.isArray(params.id)
@@ -207,14 +210,16 @@ export default function AlunoFormScreen() {
         tipo: "RESPONSAVEL",
       });
 
+      const novoId = criado?.responsavel?.id || criado?.user?.responsavel?.id;
+      if (novoId) {
+        if (userId) {
+          await registrarResponsavelDoMotoristaLocal(userId, novoId);
+        }
+        setResponsavelId(novoId);
+      }
       await queryClient.invalidateQueries({
         queryKey: ALUNOS_KEYS.responsaveis,
       });
-
-      const novoId = criado?.responsavel?.id || criado?.user?.responsavel?.id;
-      if (novoId) {
-        setResponsavelId(novoId);
-      }
       if (!nomeContatoEntrega.trim()) {
         setNomeContatoEntrega(novoRespNome.trim());
       }
