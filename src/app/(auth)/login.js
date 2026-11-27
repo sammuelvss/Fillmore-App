@@ -54,8 +54,12 @@ export default function LoginScreen() {
     setLoadingQuick(true);
     try {
       const sessionUser = await getSessionRequest(tokenLimpo);
+      if (sessionUser?.tipo === "RESPONSAVEL") {
+        showSnackbar("Este app é para motoristas", "error");
+        return;
+      }
       setAuth(sessionUser, tokenLimpo);
-      showSnackbar(`Sessão restaurada para ${sessionUser?.nome || "usuário"}!`, "success");
+      showSnackbar(`Sessão restaurada para ${sessionUser?.nome || "motorista"}!`, "success");
     } catch (e) {
       showSnackbar(e.friendlyMessage || "Token inválido ou expirado.", "error");
     } finally {

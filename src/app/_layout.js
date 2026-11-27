@@ -55,7 +55,11 @@ function NavigationGuard({ children }) {
   const router = useRouter();
   const segments = useSegments();
   const token = useAuthStore((state) => state.token);
+  const user = useAuthStore((state) => state.user);
+  const clearAuth = useAuthStore((state) => state.clearAuth);
   const isHydrated = useAuthStore((state) => state.isHydrated);
+  const resetOperacional = useAppStore((state) => state.resetOperacional);
+  const showSnackbar = useAppStore((state) => state.showSnackbar);
   const hidratado = isHydrated || Boolean(useAuthStore.persist?.hasHydrated?.());
 
   useEffect(() => {
@@ -63,12 +67,32 @@ function NavigationGuard({ children }) {
 
     const inAuthGroup = segments[0] === "(auth)";
 
+    if (token && user?.tipo === "RESPONSAVEL") {
+      clearAuth();
+      resetOperacional();
+      queryClient.clear();
+      showSnackbar("Este app é para motoristas", "error");
+      if (!inAuthGroup) {
+        router.replace("/(auth)/login");
+      }
+      return;
+    }
+
     if (!token && !inAuthGroup) {
       router.replace("/(auth)/login");
     } else if (token && inAuthGroup) {
-      router.replace("/(tabs)");
+      router.replace("/(tabs)/hoje");
     }
-  }, [token, hidratado, segments, router]);
+  }, [
+    token,
+    user?.tipo,
+    hidratado,
+    segments,
+    router,
+    clearAuth,
+    resetOperacional,
+    showSnackbar,
+  ]);
 
   if (!hidratado) {
     return (

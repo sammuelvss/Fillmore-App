@@ -147,18 +147,6 @@ export default function LotacaoRotaScreen() {
     }
   };
 
-  if (!isMotorista) {
-    return (
-      <View style={styles.centered}>
-        <EmptyState
-          icon="shield-lock-outline"
-          title="Acesso Restrito ao Motorista"
-          description="A gestão de lotação e vínculo de alunos às rotas é realizada pelo motorista da van."
-        />
-      </View>
-    );
-  }
-
   if (rotasQuery.isLoading) {
     return (
       <View style={styles.centered}>

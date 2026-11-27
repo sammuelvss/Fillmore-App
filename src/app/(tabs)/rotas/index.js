@@ -137,18 +137,6 @@ export default function RotasListScreen() {
     }
   };
 
-  if (!isMotorista) {
-    return (
-      <View style={styles.centeredContainer}>
-        <EmptyState
-          icon="shield-lock-outline"
-          title="Acesso Restrito ao Motorista"
-          description="De acordo com as regras de negócio da API (/rotas), apenas usuários autenticados com perfil MOTORISTA podem cadastrar ou gerenciar rotas escolares."
-        />
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       {/* Painel Superior de Busca e Filtro por Turno */}

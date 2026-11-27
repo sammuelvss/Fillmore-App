@@ -57,8 +57,7 @@ export default function AlunosListScreen() {
   const rotaAtiva = useAppStore((state) => state.rotaAtiva);
   const setRotaAtiva = useAppStore((state) => state.setRotaAtiva);
 
-  const isMotorista = user?.tipo === "MOTORISTA" || !user?.tipo;
-  const isResponsavel = user?.tipo === "RESPONSAVEL";
+  const isMotorista = true;
 
   const [searchQuery, setSearchQuery] = useState("");
   const [modalidadeFiltro, setModalidadeFiltro] = useState("TODOS");
@@ -241,20 +240,6 @@ export default function AlunosListScreen() {
               Ver Todos os Alunos
             </Button>
           </View>
-        </Surface>
-      ) : null}
-
-      {/* Banner Informativo para Responsável */}
-      {isResponsavel ? (
-        <Surface style={styles.respBanner} elevation={0}>
-          <MaterialCommunityIcons
-            name="account-child-outline"
-            size={20}
-            color="#92400E"
-          />
-          <Text variant="bodySmall" style={styles.respBannerText}>
-            Exibindo os alunos vinculados ao seu perfil de responsável.
-          </Text>
         </Surface>
       ) : null}
 

@@ -25,7 +25,7 @@ import {
 export default function PerfilScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
-  const isMotorista = user?.tipo === "MOTORISTA";
+  const isMotorista = true;
 
   const profile = useUserProfileQuery(user?.id);
   const update = useUpdateProfileMutation();

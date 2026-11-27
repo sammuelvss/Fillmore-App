@@ -1,34 +1,44 @@
 import React from "react";
-import { TouchableOpacity } from "react-native";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Tabs, useRouter } from "expo-router";
+import { Avatar } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { colors } from "../../theme";
+import { useAuthStore } from "../../store/useAuthStore";
 
-/**
- * Navegação Principal em Abas (5 abas principais; Perfil e Sobre acessíveis pelo cabeçalho/Home)
- */
+// Navegação principal motorista-only: 4 abas (Hoje, Rotas, Alunos, Financeiro) + Avatar para Perfil
 export default function TabsLayout() {
   const router = useRouter();
+  const user = useAuthStore((state) => state.user);
+  const iniciais = (user?.nome || "M")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase();
 
-  const renderPerfilHeaderButton = () => (
+  const renderPerfilAvatarButton = () => (
     <TouchableOpacity
       onPress={() => router.push("/(tabs)/perfil")}
-      style={{ marginRight: 14, padding: 4 }}
+      style={styles.headerTouch}
       accessibilityLabel="Abrir Meu Perfil"
     >
-      <MaterialCommunityIcons
-        name="account-circle-outline"
-        size={26}
-        color="#FFFFFF"
+      <Avatar.Text
+        size={34}
+        label={iniciais || "M"}
+        style={{ backgroundColor: colors.primary }}
+        color={colors.text}
+        labelStyle={{ fontWeight: "800", fontSize: 13 }}
       />
     </TouchableOpacity>
   );
 
-  const renderVoltarHomeButton = () => (
+  const renderVoltarHojeButton = () => (
     <TouchableOpacity
-      onPress={() => router.replace("/(tabs)")}
-      style={{ marginLeft: 14, padding: 4 }}
-      accessibilityLabel="Voltar para Início"
+      onPress={() => router.replace("/(tabs)/hoje")}
+      style={styles.headerBackTouch}
+      accessibilityLabel="Voltar para Hoje"
     >
       <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
     </TouchableOpacity>
@@ -44,30 +54,30 @@ export default function TabsLayout() {
         headerTitleStyle: {
           fontWeight: "800",
         },
-        headerRight: renderPerfilHeaderButton,
+        headerRight: renderPerfilAvatarButton,
         tabBarActiveTintColor: colors.primaryDark,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
-          height: 62,
+          height: 64,
           paddingBottom: 8,
           paddingTop: 6,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: "700",
         },
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="hoje"
         options={{
-          title: "Início",
-          headerTitle: "Fillmore • Painel Escolar",
+          title: "Hoje",
+          headerTitle: "Fillmore • Hoje",
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
-              name="view-dashboard-outline"
+              name="calendar-check-outline"
               size={size}
               color={color}
             />
@@ -109,7 +119,7 @@ export default function TabsLayout() {
         name="financeiro/index"
         options={{
           title: "Financeiro",
-          headerTitle: "Mensalidades & Pix",
+          headerTitle: "Financeiro & Pix",
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
               name="cash-multiple"
@@ -123,15 +133,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="operacao/index"
         options={{
+          href: null,
           title: "Operação",
           headerTitle: "Diário de Bordo",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="clipboard-check-outline"
-              size={size}
-              color={color}
-            />
-          ),
         }}
       />
 
@@ -141,7 +145,7 @@ export default function TabsLayout() {
           href: null,
           title: "Perfil",
           headerTitle: "Meu Perfil",
-          headerLeft: renderVoltarHomeButton,
+          headerLeft: renderVoltarHojeButton,
           headerRight: () => null,
         }}
       />
@@ -152,9 +156,26 @@ export default function TabsLayout() {
           href: null,
           title: "Sobre",
           headerTitle: "Sobre o Projeto & Equipe",
-          headerLeft: renderVoltarHomeButton,
+          headerLeft: renderVoltarHojeButton,
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  headerTouch: {
+    width: 48,
+    height: 48,
+    marginRight: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerBackTouch: {
+    width: 48,
+    height: 48,
+    marginLeft: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});

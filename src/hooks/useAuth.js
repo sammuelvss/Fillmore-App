@@ -22,8 +22,12 @@ export const useLoginMutation = () => {
   return useMutation({
     mutationFn: loginRequest,
     onSuccess: ({ user, token, refreshToken }) => {
+      if (user?.tipo === "RESPONSAVEL") {
+        showSnackbar("Este app é para motoristas", "error");
+        return;
+      }
       setAuth(user, token, refreshToken);
-      showSnackbar(`Bem-vindo(a), ${user?.nome || "usuário"}!`, "success");
+      showSnackbar(`Bem-vindo(a), ${user?.nome || "motorista"}!`, "success");
     },
     onError: (e) =>
       showSnackbar(e.friendlyMessage || "Falha ao autenticar.", "error"),
