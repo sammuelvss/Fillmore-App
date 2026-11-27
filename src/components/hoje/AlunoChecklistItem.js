@@ -207,7 +207,12 @@ export default function AlunoChecklistItem({
 
     await abrirWhatsApp(
       telefoneResponsavel,
-      mensagemVanChegando({ alunoNome: aluno.nome, motoristaNome }),
+      mensagemVanChegando({
+        alunoId: aluno.id,
+        alunoNome: aluno.nome,
+        turno,
+        motoristaNome,
+      }),
     );
   };
 

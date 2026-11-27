@@ -134,6 +134,7 @@ export const useTrajetoOtimizadoQuery = (id, data, options = {}) => {
       Boolean(token) &&
       Boolean(id) &&
       (options.enabled !== undefined ? options.enabled : true),
+    refetchInterval: 1000 * 8,
   });
 };
 

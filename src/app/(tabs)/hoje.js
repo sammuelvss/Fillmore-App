@@ -28,6 +28,7 @@ import EmptyState from "../../components/EmptyState";
 import ErrorState from "../../components/ErrorState";
 import OnboardingCard from "../../components/hoje/OnboardingCard";
 import AlunoChecklistItem from "../../components/hoje/AlunoChecklistItem";
+import AvisarTodosRotaModal from "../../components/rotas/AvisarTodosRotaModal";
 
 // Aba Hoje (Fase 3): seletor de turno, card "Rota de hoje", resumo do dia e checklist de embarque
 export default function HojeScreen() {
@@ -45,6 +46,7 @@ export default function HojeScreen() {
 
   const [statusMapa, setStatusMapa] = useState({});
   const [atrasosMapa, setAtrasosMapa] = useState({});
+  const [avisarTodosVisible, setAvisarTodosVisible] = useState(false);
 
   useEffect(() => {
     if (turnoFiltro !== "MANHA" && turnoFiltro !== "TARDE") {
@@ -326,6 +328,19 @@ export default function HojeScreen() {
           >
             Iniciar trajeto
           </Button>
+
+          {alunosDaRota.length > 0 ? (
+            <Button
+              mode="outlined"
+              icon="whatsapp"
+              textColor="#FFFFFF"
+              contentStyle={{ minHeight: 48 }}
+              style={styles.avisarTodosBtn}
+              onPress={() => setAvisarTodosVisible(true)}
+            >
+              Avisar início da rota a todos ({alunosDaRota.length})
+            </Button>
+          ) : null}
         </Surface>
       ) : null}
 
@@ -338,72 +353,83 @@ export default function HojeScreen() {
   );
 
   return (
-    <FlatList
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      data={rotaHoje ? alunosDaRota : []}
-      keyExtractor={(item) => String(item.id)}
-      ListHeaderComponent={renderHeader}
-      refreshControl={
-        <RefreshControl
-          refreshing={rotasQuery.isRefetching || alunosRotaQuery.isRefetching}
-          onRefresh={handleRefresh}
-          colors={[colors.primary]}
-        />
-      }
-      renderItem={({ item }) => (
-        <AlunoChecklistItem
-          aluno={item}
-          turno={turnoAtivo}
-          dataHoje={dataHoje}
-          motoristaNome={user?.nome}
-          onStatusChange={handleStatusChange}
-          onAtrasoChange={handleAtrasoChange}
-        />
-      )}
-      ListEmptyComponent={
-        !rotaHoje ? (
-          <EmptyState
-            icon="map-marker-plus-outline"
-            title={`Nenhuma rota no turno da ${
-              turnoAtivo === "MANHA" ? "manhã" : "tarde"
-            }`}
-            description="Crie sua rota deste turno para acompanhar os alunos e iniciar o trajeto do dia."
-            actionLabel="Criar minha primeira rota"
-            onAction={() => router.push("/(tabs)/rotas/form")}
+    <>
+      <FlatList
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        data={rotaHoje ? alunosDaRota : []}
+        keyExtractor={(item) => String(item.id)}
+        ListHeaderComponent={renderHeader}
+        refreshControl={
+          <RefreshControl
+            refreshing={rotasQuery.isRefetching || alunosRotaQuery.isRefetching}
+            onRefresh={handleRefresh}
+            colors={[colors.primary]}
           />
-        ) : alunosRotaQuery.isLoading ? (
-          <View style={styles.loaderInline}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text variant="bodySmall" style={styles.loadingText}>
-              Carregando alunos da rota...
-            </Text>
-          </View>
-        ) : (
-          <EmptyState
-            icon="account-plus-outline"
-            title="Sem alunos nesta rota"
-            description={
-              todosAlunos.length === 0
-                ? "Cadastre seus alunos para vinculá-los à rota e marcar os embarques do dia."
-                : "Vincule os alunos já cadastrados a esta rota para montar sua lista de embarque."
-            }
-            actionLabel={
-              todosAlunos.length === 0
-                ? "Cadastrar aluno"
-                : "Vincular alunos à rota"
-            }
-            onAction={() =>
-              router.push(
+        }
+        renderItem={({ item }) => (
+          <AlunoChecklistItem
+            aluno={item}
+            turno={turnoAtivo}
+            dataHoje={dataHoje}
+            motoristaNome={user?.nome}
+            onStatusChange={handleStatusChange}
+            onAtrasoChange={handleAtrasoChange}
+          />
+        )}
+        ListEmptyComponent={
+          !rotaHoje ? (
+            <EmptyState
+              icon="map-marker-plus-outline"
+              title={`Nenhuma rota no turno da ${
+                turnoAtivo === "MANHA" ? "manhã" : "tarde"
+              }`}
+              description="Crie sua rota deste turno para acompanhar os alunos e iniciar o trajeto do dia."
+              actionLabel="Criar minha primeira rota"
+              onAction={() => router.push("/(tabs)/rotas/form")}
+            />
+          ) : alunosRotaQuery.isLoading ? (
+            <View style={styles.loaderInline}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text variant="bodySmall" style={styles.loadingText}>
+                Carregando alunos da rota...
+              </Text>
+            </View>
+          ) : (
+            <EmptyState
+              icon="account-plus-outline"
+              title="Sem alunos nesta rota"
+              description={
                 todosAlunos.length === 0
-                  ? "/(tabs)/alunos/form"
-                  : "/(tabs)/alunos/lotacao",
-              )
-            }
-          />
-        )
-      }
-    />
+                  ? "Cadastre seus alunos para vinculá-los à rota e marcar os embarques do dia."
+                  : "Vincule os alunos já cadastrados a esta rota para montar sua lista de embarque."
+              }
+              actionLabel={
+                todosAlunos.length === 0
+                  ? "Cadastrar aluno"
+                  : "Vincular alunos à rota"
+              }
+              onAction={() =>
+                router.push(
+                  todosAlunos.length === 0
+                    ? "/(tabs)/alunos/form"
+                    : "/(tabs)/alunos/lotacao",
+                )
+              }
+            />
+          )
+        }
+      />
+
+      <AvisarTodosRotaModal
+        visible={avisarTodosVisible}
+        onDismiss={() => setAvisarTodosVisible(false)}
+        rotaNome={rotaHoje?.nome}
+        turno={turnoAtivo}
+        alunos={alunosDaRota.filter((a) => !statusMapa[a.id]?.ausente)}
+        motoristaNome={user?.nome}
+      />
+    </>
   );
 }
 
@@ -557,6 +583,10 @@ const styles = StyleSheet.create({
   },
   mainBtnContent: {
     height: 52,
+  },
+  avisarTodosBtn: {
+    borderRadius: 12,
+    borderColor: "rgba(255,255,255,0.35)",
   },
   sectionTitle: {
     fontWeight: "800",

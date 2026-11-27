@@ -121,7 +121,8 @@ export const useViagensQuery = (alunoId) => {
     queryKey: OPERACAO_KEYS.viagens(alunoId),
     queryFn: () => getViagensDoAluno(alunoId),
     enabled: Boolean(token && alunoId),
-    staleTime: 1000 * 15,
+    staleTime: 1000 * 5,
+    refetchInterval: 1000 * 8,
   });
 };
 

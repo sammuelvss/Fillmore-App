@@ -19,6 +19,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import EmptyState from "../../../components/EmptyState";
 import ErrorState from "../../../components/ErrorState";
 import MapaTrajeto from "../../../components/rotas/MapaTrajeto";
+import AvisarTodosRotaModal from "../../../components/rotas/AvisarTodosRotaModal";
 import {
   TURNO_LABELS,
   formatarDataBR,
@@ -99,6 +100,7 @@ export default function TrajetoRotaScreen() {
   const [canceladosExpandido, setCanceladosExpandido] = useState(false);
   const [checkinAlunoId, setCheckinAlunoId] = useState(null);
   const [checkinsConfirmados, setCheckinsConfirmados] = useState({});
+  const [avisarTodosVisible, setAvisarTodosVisible] = useState(false);
 
   const {
     data: trajeto,
@@ -354,20 +356,37 @@ export default function TrajetoRotaScreen() {
         </View>
 
         {isMotorista ? (
-          <Button
-            mode="contained"
-            icon="navigation-variant"
-            onPress={handleRecalcular}
-            loading={otimizarMutation.isPending}
-            disabled={otimizarMutation.isPending || isFetching}
-            buttonColor={colors.primary}
-            textColor="#0F172A"
-            style={styles.recalcularBtn}
-            contentStyle={{ height: 52 }}
-            labelStyle={{ fontWeight: "800", fontSize: 15 }}
-          >
-            Recalcular Melhor Rota
-          </Button>
+          <>
+            <Button
+              mode="contained"
+              icon="navigation-variant"
+              onPress={handleRecalcular}
+              loading={otimizarMutation.isPending}
+              disabled={otimizarMutation.isPending || isFetching}
+              buttonColor={colors.primary}
+              textColor="#0F172A"
+              style={styles.recalcularBtn}
+              contentStyle={{ height: 52 }}
+              labelStyle={{ fontWeight: "800", fontSize: 15 }}
+            >
+              Recalcular Melhor Rota
+            </Button>
+
+            {paradas.length > 0 ? (
+              <Button
+                mode="contained-tonal"
+                icon="whatsapp"
+                onPress={() => setAvisarTodosVisible(true)}
+                buttonColor="#DCFCE7"
+                textColor="#166534"
+                style={styles.recalcularBtn}
+                contentStyle={{ minHeight: 48 }}
+                labelStyle={{ fontWeight: "800" }}
+              >
+                Avisar início da rota a todos ({paradas.length})
+              </Button>
+            ) : null}
+          </>
         ) : null}
       </Surface>
 
@@ -667,6 +686,15 @@ export default function TrajetoRotaScreen() {
           })
         )}
       </View>
+
+      <AvisarTodosRotaModal
+        visible={avisarTodosVisible}
+        onDismiss={() => setAvisarTodosVisible(false)}
+        rotaNome={trajeto?.nome}
+        turno={trajeto?.turno}
+        alunos={paradas}
+        motoristaNome={user?.nome}
+      />
     </ScrollView>
   );
 }

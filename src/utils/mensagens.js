@@ -7,10 +7,51 @@ export const primeiroNome = (nomeCompleto) =>
     .trim()
     .split(/\s+/)[0];
 
-export const mensagemVanChegando = ({ alunoNome, motoristaNome } = {}) => {
+// Monta link HTTPS clicável no WhatsApp que abre a página web de cancelamento do responsável no navegador do celular (sem instalar o app)
+export const montarLinkCancelamentoWeb = ({
+  alunoId,
+  alunoNome,
+  turno = "MANHA",
+} = {}) => {
+  if (!alunoId) return "";
+  const nomeCurto = encodeURIComponent(primeiroNome(alunoNome));
+  const turnoLimpo = encodeURIComponent(String(turno || "MANHA").toUpperCase());
+  const rawHtmlUrl =
+    "https://raw.githubusercontent.com/sammuelvss/Fillmore-App/feat/redesign-motorista-v2/public/cancelar.html";
+  return `https://htmlpreview.github.io/?${rawHtmlUrl}#a=${encodeURIComponent(String(alunoId))}&n=${nomeCurto}&t=${turnoLimpo}`;
+};
+
+export const mensagemVanChegando = ({
+  alunoId,
+  alunoNome,
+  turno,
+  motoristaNome,
+} = {}) => {
   const aluno = primeiroNome(alunoNome);
   const motorista = motoristaNome ? ` (${motoristaNome})` : "";
-  return `Olá! A van escolar${motorista} está chegando para o embarque de ${aluno}. Por favor, aguarde no ponto combinado.`;
+  const link = montarLinkCancelamentoWeb({ alunoId, alunoNome, turno });
+  const blocoLink = link
+    ? `\n\nCaso ${aluno} não vá hoje, toque neste link para avisar e atualizar a rota do motorista automaticamente:\n${link}`
+    : "";
+  return `Olá! A van escolar${motorista} está chegando para o embarque de ${aluno}. Por favor, aguarde no ponto combinado.${blocoLink}`;
+};
+
+export const mensagemInicioRota = ({
+  alunoId,
+  alunoNome,
+  rotaNome,
+  turno,
+  motoristaNome,
+} = {}) => {
+  const aluno = primeiroNome(alunoNome);
+  const motorista = motoristaNome ? ` (${motoristaNome})` : "";
+  const turnoTexto = turno === "TARDE" ? "da tarde" : "da manhã";
+  const rotaTexto = rotaNome ? ` "${rotaNome}"` : "";
+  const link = montarLinkCancelamentoWeb({ alunoId, alunoNome, turno });
+  const blocoLink = link
+    ? `\n\nCaso ${aluno} não vá hoje, toque neste link para avisar e atualizar a rota do motorista automaticamente:\n${link}`
+    : "";
+  return `Olá! A van escolar${motorista} acabou de iniciar a rota ${turnoTexto}${rotaTexto} para buscar/entregar ${aluno}.${blocoLink}`;
 };
 
 export const mensagemCobrancaPix = ({
@@ -40,7 +81,10 @@ export const mensagemCobrancaPix = ({
   return `Olá! Passando para lembrar da mensalidade do transporte escolar de ${aluno}${ref}, no valor de ${valorFmt} (vencimento em ${vencFmt}).${pixTexto}\n\nQualquer dúvida, estou à disposição!`;
 };
 
-export const mensagemContatoResponsavel = ({ alunoNome, motoristaNome } = {}) => {
+export const mensagemContatoResponsavel = ({
+  alunoNome,
+  motoristaNome,
+} = {}) => {
   const aluno = primeiroNome(alunoNome);
   const motorista = motoristaNome ? `, motorista ${motoristaNome}` : "";
   return `Olá! Aqui é do transporte escolar Fillmore${motorista}, falando sobre ${aluno}.`;

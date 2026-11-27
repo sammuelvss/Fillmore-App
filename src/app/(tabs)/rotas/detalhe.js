@@ -30,6 +30,7 @@ import {
 } from "../../../hooks/useRotas";
 import { useAlunosDaRotaQuery } from "../../../hooks/useAlunos";
 import ErrorState from "../../../components/ErrorState";
+import AvisarTodosRotaModal from "../../../components/rotas/AvisarTodosRotaModal";
 
 /**
  * Detalhe da Rota Escolar — Fase 4
@@ -51,6 +52,7 @@ export default function RotaDetalheScreen() {
   const showSnackbar = useAppStore((state) => state.showSnackbar);
 
   const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
+  const [avisarTodosVisible, setAvisarTodosVisible] = useState(false);
 
   const rotaQuery = useRotaDetailQuery(rotaId);
   const alunosQuery = useAlunosDaRotaQuery(rotaId);
@@ -292,6 +294,21 @@ export default function RotaDetalheScreen() {
           Ver trajeto
         </Button>
 
+        {alunos.length > 0 ? (
+          <Button
+            mode="contained-tonal"
+            icon="whatsapp"
+            onPress={() => setAvisarTodosVisible(true)}
+            buttonColor="#DCFCE7"
+            textColor="#166534"
+            style={styles.duplicateBtn}
+            contentStyle={styles.secondaryBtnContent}
+            labelStyle={{ fontWeight: "800" }}
+          >
+            Avisar início da rota a todos ({alunos.length})
+          </Button>
+        ) : null}
+
         {/* Ações Secundárias */}
         <View style={styles.secondaryActionsGrid}>
           <Button
@@ -487,6 +504,15 @@ export default function RotaDetalheScreen() {
           </Dialog.Actions>
         </Dialog>
       </Portal>
+
+      <AvisarTodosRotaModal
+        visible={avisarTodosVisible}
+        onDismiss={() => setAvisarTodosVisible(false)}
+        rotaNome={rota.nome}
+        turno={rota.turno}
+        alunos={alunos}
+        motoristaNome={user?.nome}
+      />
     </ScrollView>
   );
 }
