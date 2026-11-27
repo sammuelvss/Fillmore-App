@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Fillmore • Avisar Ausência na Van</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background: #0F172A; color: #0F172A; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 18px; }
+    .container { width: 100%; max-width: 420px; }
+    .hero { text-align: center; margin-bottom: 18px; color: #FFFFFF; }
+    .logo { width: 64px; height: 64px; border-radius: 18px; background: #F59E0B; color: #0F172A; font-size: 30px; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 10px; box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3); }
+    .brand { font-size: 22px; font-weight: 900; letter-spacing: 1px; }
+    .sub { font-size: 13px; color: #CBD5E1; margin-top: 4px; }
+    .card { background: #FFFFFF; border-radius: 20px; padding: 22px; box-shadow: 0 12px 32px rgba(0,0,0,0.35); }
+    .eyebrow { font-size: 11px; font-weight: 800; color: #D97706; text-transform: uppercase; letter-spacing: 0.8px; }
+    .aluno-name { font-size: 22px; font-weight: 800; color: #0F172A; margin-top: 4px; }
+    .date-badge { display: inline-block; margin-top: 8px; background: #F1F5F9; color: #334155; font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 8px; }
+    .divider { height: 1px; background: #E2E8F0; margin: 16px 0; }
+    label { display: block; font-size: 13px; font-weight: 700; color: #1E293B; margin-bottom: 8px; }
+    .shift-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+    .shift-btn { border: 1.5px solid #CBD5E1; background: #F8FAFC; color: #334155; border-radius: 10px; padding: 10px 6px; font-size: 12px; font-weight: 700; cursor: pointer; text-align: center; transition: all 0.15s; }
+    .shift-btn.active { border-color: #D97706; background: #FEF3C7; color: #92400E; font-weight: 800; }
+    input[type="text"] { width: 100%; border: 1.5px solid #CBD5E1; border-radius: 12px; padding: 12px 14px; font-size: 14px; color: #0F172A; outline: none; margin-bottom: 16px; }
+    input[type="text"]:focus { border-color: #F59E0B; }
+    .btn-cancel { width: 100%; height: 54px; border: none; border-radius: 14px; background: #DC2626; color: #FFFFFF; font-size: 15px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25); }
+    .btn-cancel:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-reactivate { width: 100%; height: 48px; border: 1.5px solid #0F172A; border-radius: 12px; background: #FFFFFF; color: #0F172A; font-size: 14px; font-weight: 800; cursor: pointer; margin-top: 10px; }
+    .status-box { border-radius: 14px; padding: 14px; margin-bottom: 14px; font-size: 13px; line-height: 1.45; font-weight: 600; display: none; }
+    .status-box.success { display: block; background: #DCFCE7; color: #166534; border: 1px solid #86EFAC; }
+    .status-box.error { display: block; background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
+    .status-box.info { display: block; background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; }
+    .footer { text-align: center; color: #94A3B8; font-size: 12px; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <div class="logo">🚐</div>
+      <div class="brand">FILLMORE</div>
+      <div class="sub">Aviso Rápido do Responsável • Recife/PE</div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">Passageiro(a) da Van</div>
+      <div id="alunoNomeEl" class="aluno-name">Carregando aluno...</div>
+      <div id="dataHojeEl" class="date-badge">Hoje</div>
+
+      <div class="divider"></div>
+
+      <div id="statusBox" class="status-box"></div>
+
+      <div id="formArea">
+        <label>Qual turno seu(sua) filho(a) NÃO vai hoje?</label>
+        <div class="shift-grid">
+          <button type="button" class="shift-btn active" data-shift="MANHA" onclick="selecionarTurno('MANHA')">☀️ Manhã</button>
+          <button type="button" class="shift-btn" data-shift="TARDE" onclick="selecionarTurno('TARDE')">🌇 Tarde</button>
+          <button type="button" class="shift-btn" data-shift="AMBOS" onclick="selecionarTurno('AMBOS')">📅 Dia todo</button>
+        </div>
+
+        <label for="motivoInput">Motivo (opcional)</label>
+        <input id="motivoInput" type="text" placeholder="Ex.: Consulta médica / Vai com os pais" maxlength="160" />
+
+        <button id="btnConfirmar" type="button" class="btn-cancel" onclick="confirmarAusencia()">
+          Confirmar que não vai hoje
+        </button>
+      </div>
+
+      <div id="reativarArea" style="display: none;">
+        <button id="btnReativar" type="button" class="btn-reactivate" onclick="reativarViagem()">
+          Mudou de ideia? Reativar presença na van
+        </button>
+      </div>
+    </div>
+
+    <div class="footer">
+      O motorista recebe a atualização na rota automaticamente, sem precisar tocar no celular enquanto dirige.
+    </div>
+  </div>
+
+  <script>
+    var API_BASE = "https://fillmore-back-end-express.vercel.app";
+    var rawHash = (window.location.hash || "").replace(/^#\/?/, "");
+    var hashQuery = rawHash.indexOf("?") >= 0 ? rawHash.substring(rawHash.indexOf("?")) : (rawHash.indexOf("=") >= 0 ? "?" + rawHash : "");
+    var params = new URLSearchParams(hashQuery || window.location.search);
+
+    var alunoId = params.get("a") || params.get("alunoId") || "";
+    var alunoNomeParam = params.get("n") || params.get("nome") || "Aluno(a)";
+    var turnoAtual = (params.get("t") || params.get("turno") || "MANHA").toUpperCase();
+    var tkParam = params.get("k") || "";
+    var viagemCriadaId = null;
+
+    function getHojeLocal() {
+      var d = new Date();
+      var ano = d.getFullYear();
+      var mes = String(d.getMonth() + 1).padStart(2, "0");
+      var dia = String(d.getDate()).padStart(2, "0");
+      return ano + "-" + mes + "-" + dia;
+    }
+
+    function formatarDataBR(iso) {
+      var p = iso.split("-");
+      return p[2] + "/" + p[1] + "/" + p[0];
+    }
+
+    var dataHoje = getHojeLocal();
+    document.getElementById("alunoNomeEl").innerText = alunoNomeParam;
+    document.getElementById("dataHojeEl").innerText = "Data: " + formatarDataBR(dataHoje);
+
+    function selecionarTurno(novoTurno) {
+      turnoAtual = novoTurno;
+      var botoes = document.querySelectorAll(".shift-btn");
+      for (var i = 0; i < botoes.length; i++) {
+        if (botoes[i].getAttribute("data-shift") === novoTurno) {
+          botoes[i].classList.add("active");
+        } else {
+          botoes[i].classList.remove("active");
+        }
+      }
+    }
+
+    if (turnoAtual === "TARDE" || turnoAtual === "AMBOS") {
+      selecionarTurno(turnoAtual);
+    } else {
+      selecionarTurno("MANHA");
+    }
+
+    function mostrarStatus(msg, tipo) {
+      var box = document.getElementById("statusBox");
+      box.className = "status-box " + tipo;
+      box.innerText = msg;
+    }
+
+    async function obterToken() {
+      if (tkParam) return tkParam;
+      var resp = await fetch(API_BASE + "/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "carlos.silva@fillmore.app", senha: "resp1234" })
+      });
+      var data = await resp.json();
+      tkParam = data.token;
+      return tkParam;
+    }
+
+    async function verificarEstadoInicial() {
+      if (!alunoId) {
+        mostrarStatus("Link incompleto: identificador do aluno não encontrado.", "error");
+        document.getElementById("btnConfirmar").disabled = true;
+        return;
+      }
+      try {
+        var tk = await obterToken();
+        var res = await fetch(API_BASE + "/alunos/" + alunoId + "/viagens", {
+          headers: { "Authorization": "Bearer " + tk }
+        });
+        if (!res.ok) return;
+        var lista = await res.json();
+        if (Array.isArray(lista)) {
+          var existente = lista.find(function (v) {
+            return String(v.data).slice(0, 10) === dataHoje &&
+              (v.turnoCancelado === turnoAtual || v.turnoCancelado === "AMBOS");
+          });
+          if (existente) {
+            viagemCriadaId = existente.id;
+            mostrarStatus("✅ Ausência já confirmada para hoje! O aluno já foi retirado da rota do motorista.", "success");
+            document.getElementById("reativarArea").style.display = "block";
+          }
+        }
+      } catch (e) {}
+    }
+
+    async function confirmarAusencia() {
+      if (!alunoId) return;
+      var btn = document.getElementById("btnConfirmar");
+      var motivo = document.getElementById("motivoInput").value.trim() || "Avisado pelo responsável via link do WhatsApp";
+      btn.disabled = true;
+      btn.innerText = "Avisando motorista...";
+
+      try {
+        var tk = await obterToken();
+        var res = await fetch(API_BASE + "/alunos/" + alunoId + "/viagens", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + tk
+          },
+          body: JSON.stringify({
+            data: dataHoje,
+            turnoCancelado: turnoAtual,
+            motivoCancelamento: motivo
+          })
+        });
+        var body = await res.json().catch(function () { return {}; });
+        if (!res.ok) {
+          throw new Error(body.error || body.message || "Não foi possível registrar a ausência.");
+        }
+        viagemCriadaId = body.id;
+        mostrarStatus("✅ Pronto! O motorista foi avisado e " + alunoNomeParam + " já saiu da rota de hoje automaticamente.", "success");
+        document.getElementById("reativarArea").style.display = "block";
+        btn.innerText = "Ausência confirmada ✓";
+      } catch (err) {
+        mostrarStatus(err.message || "Erro ao comunicar com o servidor.", "error");
+        btn.disabled = false;
+        btn.innerText = "Confirmar que não vai hoje";
+      }
+    }
+
+    async function reativarViagem() {
+      if (!alunoId || !viagemCriadaId) return;
+      var btnR = document.getElementById("btnReativar");
+      btnR.disabled = true;
+      btnR.innerText = "Reativando...";
+      try {
+        var tk = await obterToken();
+        await fetch(API_BASE + "/alunos/" + alunoId + "/viagens/" + viagemCriadaId, {
+          method: "DELETE",
+          headers: { "Authorization": "Bearer " + tk }
+        });
+        viagemCriadaId = null;
+        mostrarStatus("🚐 Presença reativada! O aluno voltou para a rota de hoje.", "info");
+        document.getElementById("reativarArea").style.display = "none";
+        var btnC = document.getElementById("btnConfirmar");
+        btnC.disabled = false;
+        btnC.innerText = "Confirmar que não vai hoje";
+      } catch (e) {
+        mostrarStatus("Não foi possível reativar agora.", "error");
+      } finally {
+        btnR.disabled = false;
+        btnR.innerText = "Mudou de ideia? Reativar presença na van";
+      }
+    }
+
+    verificarEstadoInicial();
+  </script>
+</body>
+</html>
