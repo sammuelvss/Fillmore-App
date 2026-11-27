@@ -19,8 +19,8 @@ export const colors = {
   border: "#E2E8F0", // Slate 200
   success: "#10B981", // Emerald 500
   successLight: "#D1FAE5",
-  warning: "#F59E0B", // Amber 500
-  warningLight: "#FEF3C7",
+  warning: "#C2410C", // Orange 700 — distinto do botão primário (#F59E0B)
+  warningLight: "#FFEDD5",
   error: "#EF4444", // Red 500
   errorLight: "#FEE2E2",
   info: "#3B82F6", // Blue 500

@@ -48,11 +48,13 @@ export const useSignUpMutation = () => {
 // Logout: revoga o token na API; se falhar, sai localmente mesmo assim
 export const useLogoutMutation = () => {
   const clearAuth = useAuthStore((s) => s.clearAuth);
+  const resetOperacional = useAppStore((s) => s.resetOperacional);
   const showSnackbar = useAppStore((s) => s.showSnackbar);
   const queryClient = useQueryClient();
 
   const sair = (msg) => {
     clearAuth();
+    resetOperacional();
     queryClient.clear();
     if (msg) showSnackbar(msg, "info");
   };
@@ -93,6 +95,7 @@ export const useUpdateProfileMutation = () => {
 
 export const useDeleteAccountMutation = () => {
   const clearAuth = useAuthStore((s) => s.clearAuth);
+  const resetOperacional = useAppStore((s) => s.resetOperacional);
   const showSnackbar = useAppStore((s) => s.showSnackbar);
   const queryClient = useQueryClient();
 
@@ -100,6 +103,7 @@ export const useDeleteAccountMutation = () => {
     mutationFn: deleteUserAccount,
     onSuccess: () => {
       clearAuth();
+      resetOperacional();
       queryClient.clear();
       showSnackbar("Conta excluída.", "info");
     },

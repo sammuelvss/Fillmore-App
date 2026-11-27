@@ -2,35 +2,64 @@ import React, { useEffect } from "react";
 import { View, StyleSheet } from "react-native";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import {
   PaperProvider,
   ActivityIndicator,
+  Button,
   Snackbar,
   Text,
 } from "react-native-paper";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { fillmoreTheme, colors } from "../theme";
+import { queryClient } from "../lib/queryClient";
 import { useAuthStore } from "../store/useAuthStore";
 import { useAppStore } from "../store/useAppStore";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+// ErrorBoundary oficial do Expo Router para evitar tela branca em erros inesperados
+export function ErrorBoundary({ retry }) {
+  return (
+    <SafeAreaProvider>
+      <PaperProvider theme={fillmoreTheme}>
+        <View style={styles.errorContainer}>
+          <MaterialCommunityIcons
+            name="alert-octagon-outline"
+            size={56}
+            color={colors.error}
+          />
+          <Text variant="headlineSmall" style={styles.errorTitle}>
+            Algo deu errado
+          </Text>
+          <Text variant="bodyMedium" style={styles.errorSubtitle}>
+            Ocorreu um erro inesperado ao abrir esta tela. Tente recarregar o aplicativo.
+          </Text>
+          <Button
+            mode="contained"
+            icon="refresh"
+            onPress={retry}
+            buttonColor={colors.primary}
+            textColor={colors.text}
+            contentStyle={{ height: 52 }}
+            style={styles.errorButton}
+          >
+            Recarregar
+          </Button>
+        </View>
+      </PaperProvider>
+    </SafeAreaProvider>
+  );
+}
 
 function NavigationGuard({ children }) {
   const router = useRouter();
   const segments = useSegments();
   const token = useAuthStore((state) => state.token);
   const isHydrated = useAuthStore((state) => state.isHydrated);
+  const hidratado = isHydrated || Boolean(useAuthStore.persist?.hasHydrated?.());
 
   useEffect(() => {
-    if (!isHydrated) return;
+    if (!hidratado) return;
 
     const inAuthGroup = segments[0] === "(auth)";
 
@@ -39,9 +68,9 @@ function NavigationGuard({ children }) {
     } else if (token && inAuthGroup) {
       router.replace("/(tabs)");
     }
-  }, [token, isHydrated, segments, router]);
+  }, [token, hidratado, segments, router]);
 
-  if (!isHydrated) {
+  if (!hidratado) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -86,12 +115,24 @@ export default function RootLayout() {
           <Snackbar
             visible={snackbar.visible}
             onDismiss={hideSnackbar}
-            duration={3500}
-            action={{
-              label: "OK",
-              textColor: colors.primaryAccent,
-              onPress: hideSnackbar,
-            }}
+            duration={snackbar.action ? 5000 : 3500}
+            action={
+              snackbar.action
+                ? {
+                    label: snackbar.action.label,
+                    textColor: colors.primaryAccent,
+                    onPress: () => {
+                      const fn = snackbar.action?.onPress;
+                      hideSnackbar();
+                      if (fn) fn();
+                    },
+                  }
+                : {
+                    label: "Fechar",
+                    textColor: colors.primaryAccent,
+                    onPress: hideSnackbar,
+                  }
+            }
             style={{ backgroundColor: getSnackbarColor() }}
           >
             {snackbar.message}
@@ -112,5 +153,27 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: "#FFFFFF",
+  },
+  errorContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.background,
+    padding: 24,
+    gap: 12,
+  },
+  errorTitle: {
+    fontWeight: "800",
+    color: colors.text,
+    textAlign: "center",
+  },
+  errorSubtitle: {
+    color: colors.textSecondary,
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  errorButton: {
+    borderRadius: 12,
+    minWidth: 200,
   },
 });
