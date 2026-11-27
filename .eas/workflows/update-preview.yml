@@ -1,0 +1,17 @@
+name: Publish EAS Update (Preview)
+
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  publish_preview_update:
+    name: Publish preview update
+    type: update
+    environment: preview
+    env:
+      EXPO_PUBLIC_API_URL: https://fillmore-back-end-express.vercel.app
+      EXPO_PUBLIC_SHOW_DEV: 'false'
+    params:
+      branch: preview
+      platform: all
