@@ -357,6 +357,7 @@ export default function FinanceiroScreen() {
   const cobrarMutation = useDispararCobrancaMutation();
 
   const [pagandoId, setPagandoId] = useState(null);
+  const [desfazendoId, setDesfazendoId] = useState(null);
   const [cobrandoId, setCobrandoId] = useState(null);
   const [faturaParaExcluir, setFaturaParaExcluir] = useState(null);
 
@@ -415,13 +416,7 @@ export default function FinanceiroScreen() {
         "success",
         {
           label: "Desfazer",
-          onPress: () => {
-            atualizarMutation.mutate({
-              alunoId: fatura.alunoId,
-              mensalidadeId: fatura.id,
-              data: { status: "PENDENTE", dataPagamento: null },
-            });
-          },
+          onPress: () => handleDesfazerPagamento(fatura),
         },
       );
     } catch (error) {
@@ -431,6 +426,28 @@ export default function FinanceiroScreen() {
       );
     } finally {
       setPagandoId(null);
+    }
+  };
+
+  const handleDesfazerPagamento = async (fatura) => {
+    setDesfazendoId(fatura.id);
+    try {
+      await atualizarMutation.mutateAsync({
+        alunoId: fatura.alunoId,
+        mensalidadeId: fatura.id,
+        data: { status: "PENDENTE", dataPagamento: null },
+      });
+      showSnackbar(
+        `Pagamento de ${fatura.aluno?.nome || "aluno"} desfeito!`,
+        "info",
+      );
+    } catch (error) {
+      showSnackbar(
+        error?.friendlyMessage || "Não foi possível desfazer o pagamento.",
+        "error",
+      );
+    } finally {
+      setDesfazendoId(null);
     }
   };
 
@@ -1094,7 +1111,23 @@ export default function FinanceiroScreen() {
                     Notificar
                   </Button>
                 </View>
-              ) : null}
+              ) : (
+                <View style={styles.cardActionsCol}>
+                  <Button
+                    mode="outlined"
+                    icon="undo-variant"
+                    textColor="#9A3412"
+                    style={styles.undoPayBtn}
+                    contentStyle={styles.actionBtnContent}
+                    labelStyle={styles.payBtnLabel}
+                    loading={desfazendoId === item.id}
+                    disabled={desfazendoId === item.id}
+                    onPress={() => handleDesfazerPagamento(item)}
+                  >
+                    Desfazer pagamento
+                  </Button>
+                </View>
+              )}
             </Surface>
           );
         }}
@@ -1716,6 +1749,12 @@ const styles = StyleSheet.create({
     width: "100%",
     borderRadius: 12,
     borderColor: "#86EFAC",
+  },
+  undoPayBtn: {
+    width: "100%",
+    borderRadius: 12,
+    borderColor: "#FDBA74",
+    backgroundColor: "#FFF7ED",
   },
   payBtnLabel: {
     fontWeight: "800",

@@ -68,6 +68,8 @@ export default function AlunoDetalheScreen() {
   const [vincularVisible, setVincularVisible] = useState(false);
   const [lotacaoConflito, setLotacaoConflito] = useState(null);
   const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
+  const [pagandoId, setPagandoId] = useState(null);
+  const [desfazendoId, setDesfazendoId] = useState(null);
 
   const alunoQuery = useAlunoDetailQuery(alunoId);
   const rotasQuery = useRotasQuery();
@@ -143,6 +145,7 @@ export default function AlunoDetalheScreen() {
   };
 
   const handleRegistrarPagamento = async (fatura) => {
+    setPagandoId(fatura.id);
     try {
       await registrarPagamentoMutation.mutateAsync({
         alunoId: aluno.id,
@@ -151,19 +154,34 @@ export default function AlunoDetalheScreen() {
       });
       showSnackbar("Pagamento registrado!", "success", {
         label: "Desfazer",
-        onPress: () => {
-          updateMensalidadeMutation.mutate({
-            alunoId: aluno.id,
-            mensalidadeId: fatura.id,
-            data: { status: "PENDENTE", dataPagamento: null },
-          });
-        },
+        onPress: () => handleDesfazerPagamento(fatura),
       });
     } catch (err) {
       showSnackbar(
         err?.friendlyMessage || "Não foi possível registrar o pagamento.",
         "error",
       );
+    } finally {
+      setPagandoId(null);
+    }
+  };
+
+  const handleDesfazerPagamento = async (fatura) => {
+    setDesfazendoId(fatura.id);
+    try {
+      await updateMensalidadeMutation.mutateAsync({
+        alunoId: aluno.id,
+        mensalidadeId: fatura.id,
+        data: { status: "PENDENTE", dataPagamento: null },
+      });
+      showSnackbar("Pagamento desfeito! Fatura voltou para em aberto.", "info");
+    } catch (err) {
+      showSnackbar(
+        err?.friendlyMessage || "Não foi possível desfazer o pagamento.",
+        "error",
+      );
+    } finally {
+      setDesfazendoId(null);
     }
   };
 
@@ -461,7 +479,7 @@ export default function AlunoDetalheScreen() {
             Nenhuma mensalidade lançada para este aluno ainda.
           </Text>
         ) : (
-          mensalidades.slice(0, 5).map((fatura, idx) => {
+          mensalidades.map((fatura, idx) => {
             const { status, diasAtraso } = resolverStatusMensalidade(fatura);
             const cfg =
               STATUS_MENSALIDADE[status] || STATUS_MENSALIDADE.PENDENTE;
@@ -472,19 +490,25 @@ export default function AlunoDetalheScreen() {
                 key={fatura.id}
                 style={[
                   styles.faturaItem,
-                  idx < Math.min(mensalidades.length, 5) - 1 &&
-                    styles.faturaBorder,
+                  idx < mensalidades.length - 1 && styles.faturaBorder,
                 ]}
               >
                 <View style={styles.faturaTopRow}>
-                  <View>
+                  <View style={{ flex: 1 }}>
                     <Text variant="titleMedium" style={styles.faturaValor}>
                       {formatarMoeda(fatura.valor)}
                     </Text>
                     <Text variant="bodySmall" style={styles.faturaVenc}>
-                      Vencimento: {formatarDataBR(fatura.dataVencimento)}
+                      Ref. {String(fatura.mesReferencia).padStart(2, "0")}/
+                      {fatura.anoReferencia} • Venc.{" "}
+                      {formatarDataBR(fatura.dataVencimento)}
                       {diasAtraso > 0 ? ` (${diasAtraso}d em atraso)` : ""}
                     </Text>
+                    {isPago && fatura.dataPagamento ? (
+                      <Text variant="labelSmall" style={styles.pagoEmText}>
+                        Pago em {formatarDataBR(fatura.dataPagamento)}
+                      </Text>
+                    ) : null}
                   </View>
 
                   <Chip
@@ -511,6 +535,8 @@ export default function AlunoDetalheScreen() {
                       style={styles.faturaActionBtn}
                       contentStyle={{ minHeight: 48 }}
                       labelStyle={{ fontWeight: "800" }}
+                      loading={pagandoId === fatura.id}
+                      disabled={pagandoId === fatura.id}
                       onPress={() => handleRegistrarPagamento(fatura)}
                     >
                       Registrar pagamento
@@ -527,7 +553,23 @@ export default function AlunoDetalheScreen() {
                       Notificar
                     </Button>
                   </View>
-                ) : null}
+                ) : (
+                  <View style={styles.faturaActions}>
+                    <Button
+                      mode="outlined"
+                      icon="undo-variant"
+                      textColor="#9A3412"
+                      style={styles.undoPayBtn}
+                      contentStyle={{ minHeight: 48 }}
+                      labelStyle={{ fontWeight: "800" }}
+                      loading={desfazendoId === fatura.id}
+                      disabled={desfazendoId === fatura.id}
+                      onPress={() => handleDesfazerPagamento(fatura)}
+                    >
+                      Desfazer pagamento
+                    </Button>
+                  </View>
+                )}
               </View>
             );
           })
@@ -787,6 +829,11 @@ const styles = StyleSheet.create({
   faturaVenc: {
     color: colors.textSecondary,
   },
+  pagoEmText: {
+    color: "#166534",
+    fontWeight: "700",
+    marginTop: 2,
+  },
   faturaActions: {
     gap: 8,
     marginTop: 4,
@@ -794,6 +841,12 @@ const styles = StyleSheet.create({
   faturaActionBtn: {
     width: "100%",
     borderRadius: 10,
+  },
+  undoPayBtn: {
+    width: "100%",
+    borderRadius: 10,
+    borderColor: "#FDBA74",
+    backgroundColor: "#FFF7ED",
   },
   deleteBtn: {
     borderRadius: 12,
