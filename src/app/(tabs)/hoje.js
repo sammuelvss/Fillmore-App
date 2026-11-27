@@ -5,13 +5,19 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { colors } from "../../theme";
 import { useAuthStore } from "../../store/useAuthStore";
+import { useRotasQuery } from "../../hooks/useRotas";
+import { useAlunosQuery } from "../../hooks/useAlunos";
 import { formatarDataBR, hojeLocal } from "../../utils/format";
+import OnboardingCard from "../../components/hoje/OnboardingCard";
 
-// Aba Hoje (placeholder da Fase 1; recebe Onboarding na Fase 2 e Checklist na Fase 3)
+// Aba Hoje (com Card de Onboarding em 3 passos da Fase 2; recebe Checklist na Fase 3)
 export default function HojeScreen() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const dataHoje = formatarDataBR(hojeLocal());
+
+  const { data: rotas = [] } = useRotasQuery();
+  const { data: alunos = [] } = useAlunosQuery();
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -39,7 +45,9 @@ export default function HojeScreen() {
         </View>
       </Surface>
 
-      {/* Espaço reservado para o Card de Onboarding (Fase 2) */}
+      {/* Card de Onboarding em 3 passos (some quando rotas, alunos e vínculos existem) */}
+      <OnboardingCard rotas={rotas} alunos={alunos} />
+
       <Surface style={styles.card} elevation={1}>
         <Text variant="titleMedium" style={styles.cardTitle}>
           Operação de Hoje

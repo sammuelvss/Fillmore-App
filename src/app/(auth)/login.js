@@ -125,7 +125,8 @@ export default function LoginScreen() {
             loading={loginMutation.isPending}
             disabled={loginMutation.isPending}
             buttonColor={colors.primary}
-            textColor={colors.secondary}
+            textColor={colors.text}
+            contentStyle={{ height: 52 }}
             style={styles.button}
           >
             Entrar
@@ -134,9 +135,10 @@ export default function LoginScreen() {
             mode="outlined"
             onPress={() => router.push("/(auth)/signup")}
             textColor={colors.secondary}
+            contentStyle={{ minHeight: 48 }}
             style={styles.button}
           >
-            Criar conta
+            Criar conta de motorista
           </Button>
         </Surface>
 

@@ -35,14 +35,35 @@ export const useLoginMutation = () => {
 };
 
 export const useSignUpMutation = () => {
+  const setAuth = useAuthStore((s) => s.setAuth);
   const showSnackbar = useAppStore((s) => s.showSnackbar);
   const router = useRouter();
 
   return useMutation({
-    mutationFn: signUpRequest,
-    onSuccess: () => {
-      showSnackbar("Conta criada! Faça login para continuar.", "success");
-      router.back();
+    mutationFn: async (userData) => {
+      const created = await signUpRequest(userData);
+      // Tenta autenticar automaticamente após criar a conta do motorista
+      try {
+        const session = await loginRequest({
+          email: userData.email,
+          senha: userData.senha,
+        });
+        return { created, session };
+      } catch {
+        return { created, session: null };
+      }
+    },
+    onSuccess: ({ session }) => {
+      if (session?.token && session?.user) {
+        setAuth(session.user, session.token, session.refreshToken);
+        showSnackbar(
+          `Conta criada! Bem-vindo(a), ${session.user.nome || "motorista"}!`,
+          "success",
+        );
+      } else {
+        showSnackbar("Conta criada! Entre com seu e-mail e senha.", "success");
+        router.back();
+      }
     },
     onError: (e) =>
       showSnackbar(e.friendlyMessage || "Não foi possível cadastrar.", "error"),
