@@ -4,33 +4,29 @@ import {
   Card,
   Text,
   Chip,
-  IconButton,
   Button,
   Divider,
   ProgressBar,
 } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { colors } from "../theme";
+import { TURNOS } from "../constants";
 
 /**
- * Card estilizado de Rota Escolar (Implementado por: Sammuel)
- * Exibe:
- * - Nome da rota e badge visual de Turno (MANHÃ / TARDE)
- * - Métricas de distância (km), tempo estimado (min) e coordenadas GPS (Recife)
- * - Barra de lotação da van calculada a partir de `alunosIda` ou `alunosVolta` vs `motorista.capacidadeVan`
- * - Botões de ação para Editar, Excluir e atalho para Alunos da Rota (Relacionamento 1 - Joao)
+ * Card de Rota Escolar — Fase 4
+ * Exibe turno, nome, lotação (ocupadas/capacidade) e no máximo 2 ações diretas
+ * ("Ver trajeto" e "Detalhes"), mantendo áreas de toque >= 48dp.
  */
 export default function RotaCard({
   rota,
   capacidadePadrao = 15,
-  onEdit,
-  onDelete,
-  onViewAlunos,
+  onPress,
   onViewTrajeto,
+  onManageAlunos,
 }) {
   const isManha = rota.turno === "MANHA";
+  const turnoInfo = TURNOS[rota.turno] || TURNOS.MANHA;
 
-  // Calcula quantos alunos estão alocados nesta rota de acordo com o turno
   const listaAlunosTurno = isManha
     ? rota.alunosIda || []
     : rota.alunosVolta || [];
@@ -45,25 +41,17 @@ export default function RotaCard({
   );
   const isLotada = vagasOcupadas >= capacidadeMaxima;
 
-  const temCoordenadasIniciais =
-    rota.pontoInicialLat !== null &&
-    rota.pontoInicialLat !== undefined &&
-    rota.pontoInicialLng !== null &&
-    rota.pontoInicialLng !== undefined;
-
-  const temCoordenadasFinais =
-    rota.pontoFinalLat !== null &&
-    rota.pontoFinalLat !== undefined &&
-    rota.pontoFinalLng !== null &&
-    rota.pontoFinalLng !== undefined;
-
   return (
-    <Card style={styles.card} mode="elevated">
+    <Card
+      style={styles.card}
+      mode="elevated"
+      onPress={() => onPress && onPress(rota)}
+    >
       <Card.Content>
-        {/* Cabeçalho: Badge de Turno + Ações rápidas */}
+        {/* Cabeçalho: Badge de Turno + Lotação */}
         <View style={styles.headerRow}>
           <Chip
-            icon={isManha ? "weather-sunny" : "weather-sunset"}
+            icon={turnoInfo.icon}
             style={[
               styles.turnoChip,
               isManha ? styles.manhaChip : styles.tardeChip,
@@ -74,26 +62,29 @@ export default function RotaCard({
             ]}
             compact
           >
-            {isManha ? "TURNO MANHÃ (IDA)" : "TURNO TARDE (VOLTA)"}
+            {turnoInfo.shortLabel}
           </Chip>
 
-          <View style={styles.actionsRight}>
-            <IconButton
-              icon="pencil-outline"
-              size={20}
-              iconColor={colors.secondary}
-              style={styles.actionIcon}
-              onPress={() => onEdit && onEdit(rota)}
-              accessibilityLabel="Editar rota"
+          <View
+            style={[
+              styles.lotacaoPill,
+              isLotada ? styles.lotacaoPillFull : styles.lotacaoPillOpen,
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="seat-passenger"
+              size={15}
+              color={isLotada ? "#991B1B" : "#166534"}
             />
-            <IconButton
-              icon="trash-can-outline"
-              size={20}
-              iconColor={colors.error}
-              style={styles.actionIcon}
-              onPress={() => onDelete && onDelete(rota)}
-              accessibilityLabel="Excluir rota"
-            />
+            <Text
+              variant="labelSmall"
+              style={[
+                styles.lotacaoText,
+                { color: isLotada ? "#991B1B" : "#166534" },
+              ]}
+            >
+              {vagasOcupadas}/{capacidadeMaxima} vagas
+            </Text>
           </View>
         </View>
 
@@ -108,52 +99,38 @@ export default function RotaCard({
           <Text variant="titleMedium" style={styles.rotaNome} numberOfLines={2}>
             {rota.nome}
           </Text>
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={22}
+            color={colors.textSecondary}
+          />
         </View>
 
-        {/* Indicadores de Distância, Tempo e Capacidade */}
+        {/* Indicadores de Distância e Tempo */}
         <View style={styles.metricsRow}>
           <View style={styles.metricBadge}>
             <MaterialCommunityIcons
               name="map-marker-distance"
-              size={18}
+              size={16}
               color={colors.secondary}
             />
             <Text variant="bodySmall" style={styles.metricText}>
-              {rota.distanciaTotalKm !== null &&
-              rota.distanciaTotalKm !== undefined
+              {rota.distanciaTotalKm != null
                 ? `${Number(rota.distanciaTotalKm).toFixed(1)} km`
-                : "Dist. N/I"}
+                : "Dist. automática"}
             </Text>
           </View>
 
           <View style={styles.metricBadge}>
             <MaterialCommunityIcons
               name="clock-outline"
-              size={18}
+              size={16}
               color={colors.secondary}
             />
             <Text variant="bodySmall" style={styles.metricText}>
-              {rota.tempoEstimadoMin !== null &&
-              rota.tempoEstimadoMin !== undefined
-                ? `${rota.tempoEstimadoMin} min`
-                : "Tempo N/I"}
-            </Text>
-          </View>
-
-          <View style={styles.metricBadge}>
-            <MaterialCommunityIcons
-              name="seat-passenger"
-              size={18}
-              color={isLotada ? colors.error : colors.success}
-            />
-            <Text
-              variant="bodySmall"
-              style={[
-                styles.metricText,
-                isLotada && { color: colors.error, fontWeight: "700" },
-              ]}
-            >
-              {vagasOcupadas}/{capacidadeMaxima} vagas
+              {rota.tempoEstimadoMin != null
+                ? `~${rota.tempoEstimadoMin} min`
+                : "Tempo automático"}
             </Text>
           </View>
         </View>
@@ -162,7 +139,7 @@ export default function RotaCard({
         <View style={styles.capacityBox}>
           <View style={styles.capacityHeader}>
             <Text variant="labelSmall" style={styles.capacityLabel}>
-              Ocupação da Van ({isManha ? "Embarque Manhã" : "Desembarque Tarde"})
+              Ocupação ({isManha ? "Ida" : "Volta"})
             </Text>
             <Text
               variant="labelSmall"
@@ -173,7 +150,7 @@ export default function RotaCard({
             >
               {isLotada
                 ? "VAN LOTADA"
-                : `${capacidadeMaxima - vagasOcupadas} disponíveis`}
+                : `${capacidadeMaxima - vagasOcupadas} livres`}
             </Text>
           </View>
           <ProgressBar
@@ -183,62 +160,37 @@ export default function RotaCard({
           />
         </View>
 
-        {/* Indicador de Mapa GPS */}
-        {(temCoordenadasIniciais || temCoordenadasFinais) && (
-          <View style={styles.coordsContainer}>
-            <View style={styles.coordItem}>
-              <MaterialCommunityIcons
-                name="map-check-outline"
-                size={15}
-                color={colors.success}
-              />
-              <Text variant="labelSmall" style={styles.coordText}>
-                Mapa GPS configurado para a Rota Inteligente
-              </Text>
-            </View>
-          </View>
-        )}
-
         <Divider style={styles.divider} />
 
-        {/* Rodapé de Ações */}
+        {/* Rodapé com até 2 ações rápidas (3ª ação é o toque no card para Detalhes) */}
         <View style={styles.footerRow}>
+          {onManageAlunos ? (
+            <Button
+              mode="outlined"
+              icon="account-group-outline"
+              style={styles.footerBtn}
+              contentStyle={styles.footerBtnContent}
+              textColor={colors.secondary}
+              onPress={() => onManageAlunos(rota)}
+            >
+              Alunos ({vagasOcupadas})
+            </Button>
+          ) : null}
+
           {onViewTrajeto ? (
             <Button
               mode="contained"
               icon="map-marker-path"
-              compact
               style={styles.footerBtn}
-              buttonColor={colors.secondary}
-              textColor="#FFFFFF"
+              contentStyle={styles.footerBtnContent}
+              buttonColor={colors.primary}
+              textColor={colors.text}
+              labelStyle={styles.primaryBtnLabel}
               onPress={() => onViewTrajeto(rota)}
             >
-              Rota do Dia
+              Ver trajeto
             </Button>
           ) : null}
-
-          <Button
-            mode="outlined"
-            icon="account-group-outline"
-            compact
-            style={styles.footerBtn}
-            textColor={colors.secondary}
-            onPress={() => onViewAlunos && onViewAlunos(rota)}
-          >
-            Alunos ({vagasOcupadas})
-          </Button>
-
-          <Button
-            mode="contained-tonal"
-            icon="pencil"
-            compact
-            style={styles.footerBtn}
-            buttonColor={colors.primaryLight}
-            textColor="#78350F"
-            onPress={() => onEdit && onEdit(rota)}
-          >
-            Editar Rota
-          </Button>
         </View>
       </Card.Content>
     </Card>
@@ -257,7 +209,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 10,
   },
   turnoChip: {
     borderRadius: 8,
@@ -269,8 +221,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#DBEAFE",
   },
   turnoChipText: {
-    fontWeight: "700",
-    fontSize: 11,
+    fontWeight: "800",
+    fontSize: 12,
   },
   manhaChipText: {
     color: "#92400E",
@@ -278,32 +230,41 @@ const styles = StyleSheet.create({
   tardeChipText: {
     color: "#1E40AF",
   },
-  actionsRight: {
+  lotacaoPill: {
     flexDirection: "row",
     alignItems: "center",
-    marginRight: -8,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
   },
-  actionIcon: {
-    margin: 0,
+  lotacaoPillOpen: {
+    backgroundColor: "#DCFCE7",
+  },
+  lotacaoPillFull: {
+    backgroundColor: "#FEE2E2",
+  },
+  lotacaoText: {
+    fontWeight: "800",
   },
   titleContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 10,
   },
   busIcon: {
     marginRight: 8,
   },
   rotaNome: {
     flex: 1,
-    fontWeight: "700",
+    fontWeight: "800",
     color: colors.secondary,
   },
   metricsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   metricBadge: {
     flexDirection: "row",
@@ -324,7 +285,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.border,
-    marginBottom: 10,
   },
   capacityHeader: {
     flexDirection: "row",
@@ -343,31 +303,21 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: "#E2E8F0",
   },
-  coordsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 6,
-    marginBottom: 8,
-  },
-  coordItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  coordText: {
-    color: colors.textSecondary,
-  },
   divider: {
-    marginVertical: 10,
+    marginVertical: 12,
   },
   footerRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
-    gap: 8,
+    gap: 10,
   },
   footerBtn: {
-    borderRadius: 8,
+    flex: 1,
+    borderRadius: 10,
+  },
+  footerBtnContent: {
+    minHeight: 48,
+  },
+  primaryBtnLabel: {
+    fontWeight: "800",
   },
 });

@@ -17,7 +17,9 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import EmptyState from "../../../components/EmptyState";
+import ErrorState from "../../../components/ErrorState";
 import MapaTrajeto from "../../../components/rotas/MapaTrajeto";
+import AvisarTodosRotaModal from "../../../components/rotas/AvisarTodosRotaModal";
 import {
   TURNO_LABELS,
   formatarDataBR,
@@ -36,8 +38,11 @@ import { colors } from "../../../theme";
 
 const adicionarDiasISO = (iso, delta) => {
   const [ano, mes, dia] = iso.split("-").map(Number);
-  const dt = new Date(Date.UTC(ano, mes - 1, dia + delta));
-  return dt.toISOString().slice(0, 10);
+  const dt = new Date(ano, mes - 1, dia + delta);
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
+  const d = String(dt.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 };
 
 const extrairDigitos = (telefone) => String(telefone || "").replace(/\D/g, "");
@@ -95,6 +100,7 @@ export default function TrajetoRotaScreen() {
   const [canceladosExpandido, setCanceladosExpandido] = useState(false);
   const [checkinAlunoId, setCheckinAlunoId] = useState(null);
   const [checkinsConfirmados, setCheckinsConfirmados] = useState({});
+  const [avisarTodosVisible, setAvisarTodosVisible] = useState(false);
 
   const {
     data: trajeto,
@@ -228,15 +234,12 @@ export default function TrajetoRotaScreen() {
   if (isError && !trajeto) {
     return (
       <View style={styles.container}>
-        <EmptyState
-          icon="alert-circle-outline"
-          title="Erro ao carregar o trajeto"
-          description={
+        <ErrorState
+          message={
             error?.friendlyMessage ||
             "Não foi possível obter a rota otimizada no momento."
           }
-          actionLabel="Tentar novamente"
-          onAction={refetch}
+          onRetry={refetch}
         />
       </View>
     );
@@ -353,18 +356,37 @@ export default function TrajetoRotaScreen() {
         </View>
 
         {isMotorista ? (
-          <Button
-            mode="contained"
-            icon="navigation-variant"
-            onPress={handleRecalcular}
-            loading={otimizarMutation.isPending}
-            disabled={otimizarMutation.isPending || isFetching}
-            buttonColor={colors.primary}
-            textColor="#0F172A"
-            style={styles.recalcularBtn}
-          >
-            Recalcular Melhor Rota
-          </Button>
+          <>
+            <Button
+              mode="contained"
+              icon="navigation-variant"
+              onPress={handleRecalcular}
+              loading={otimizarMutation.isPending}
+              disabled={otimizarMutation.isPending || isFetching}
+              buttonColor={colors.primary}
+              textColor="#0F172A"
+              style={styles.recalcularBtn}
+              contentStyle={{ height: 52 }}
+              labelStyle={{ fontWeight: "800", fontSize: 15 }}
+            >
+              Recalcular Melhor Rota
+            </Button>
+
+            {paradas.length > 0 ? (
+              <Button
+                mode="contained-tonal"
+                icon="whatsapp"
+                onPress={() => setAvisarTodosVisible(true)}
+                buttonColor="#DCFCE7"
+                textColor="#166534"
+                style={styles.recalcularBtn}
+                contentStyle={{ minHeight: 48 }}
+                labelStyle={{ fontWeight: "800" }}
+              >
+                Avisar início da rota a todos ({paradas.length})
+              </Button>
+            ) : null}
+          </>
         ) : null}
       </Surface>
 
@@ -664,6 +686,15 @@ export default function TrajetoRotaScreen() {
           })
         )}
       </View>
+
+      <AvisarTodosRotaModal
+        visible={avisarTodosVisible}
+        onDismiss={() => setAvisarTodosVisible(false)}
+        rotaNome={trajeto?.nome}
+        turno={trajeto?.turno}
+        alunos={paradas}
+        motoristaNome={user?.nome}
+      />
     </ScrollView>
   );
 }

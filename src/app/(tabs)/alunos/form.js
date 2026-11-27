@@ -10,8 +10,11 @@ import {
   ActivityIndicator,
   Button,
   Chip,
+  Dialog,
   Divider,
   HelperText,
+  Portal,
+  ProgressBar,
   SegmentedButtons,
   Surface,
   Switch,
@@ -20,30 +23,42 @@ import {
 } from "react-native-paper";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useQueryClient } from "@tanstack/react-query";
 import { colors } from "../../../theme";
-import { useAuthStore } from "../../../store/useAuthStore";
+import { MODALIDADES } from "../../../constants";
+import { mascaraTelefone } from "../../../utils/format";
 import {
+  validarDiaVencimento,
+  validarEmail,
+  validarTelefone,
+} from "../../../utils/validators";
+import { signUpRequest } from "../../../api/authApi";
+import { useAppStore } from "../../../store/useAppStore";
+import {
+  ALUNOS_KEYS,
+  registrarResponsavelDoMotoristaLocal,
   useAlunoDetailQuery,
   useCreateAlunoMutation,
   useResponsaveisQuery,
   useUpdateAlunoMutation,
 } from "../../../hooks/useAlunos";
+import { useAuthStore } from "../../../store/useAuthStore";
 import { geocodificarEndereco } from "../../../utils/geocoding";
 
 /**
- * ============================================================================
- * FORMULÁRIO DE ALUNO — CRUD & GUARDA COMPARTILHADA (Implementado por: Joao)
- * ============================================================================
- * Contempla:
- * - Identificação (`nome`, `escola`, `modalidade`, `diaVencimentoMensalidade`)
- * - Vínculo de `responsavelId` (automático se RESPONSAVEL; lista de responsáveis ou UUID se MOTORISTA)
- * - Guarda Compartilhada: `enderecoEmbarque` e `enderecoDesembarque` independentes (geocodificação automática)
- * - Contato de entrega (`nomeContatoEntrega`, `telefoneContatoEntrega`)
+ * Formulário de Aluno em 4 Etapas — Fase 4
+ * Etapa 1: Aluno e Escola (`nome`, `escola`)
+ * Etapa 2: Responsável (selecionar existente ou "Cadastrar novo responsável" em modal curto) e Modalidade
+ * Etapa 3: Endereços de Embarque e Desembarque (com switch "Mesmo endereço para ida e volta" e contato de entrega)
+ * Etapa 4: Dia de vencimento (1..31), revisão e botão primário "Salvar aluno" (52dp, amarelo com texto escuro)
  */
 export default function AlunoFormScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const params = useLocalSearchParams();
+  const queryClient = useQueryClient();
+  const showSnackbar = useAppStore((state) => state.showSnackbar);
+  const userId = useAuthStore((state) => state.user?.id);
 
   const alunoId = params.id
     ? Array.isArray(params.id)
@@ -52,14 +67,12 @@ export default function AlunoFormScreen() {
     : null;
   const isEditMode = Boolean(alunoId);
 
-  const user = useAuthStore((state) => state.user);
-  const isResponsavel = user?.tipo === "RESPONSAVEL";
-  const loggedResponsavelId = user?.responsavel?.id || "";
+  const [etapa, setEtapa] = useState(1);
 
   const { data: alunoDetalhe, isLoading: loadingDetalhe } =
     useAlunoDetailQuery(alunoId);
   const { data: responsaveis = [], isLoading: loadingResponsaveis } =
-    useResponsaveisQuery({ enabled: !isResponsavel });
+    useResponsaveisQuery();
 
   const createMutation = useCreateAlunoMutation();
   const updateMutation = useUpdateAlunoMutation();
@@ -69,9 +82,7 @@ export default function AlunoFormScreen() {
 
   const [nome, setNome] = useState("");
   const [escola, setEscola] = useState("");
-  const [responsavelId, setResponsavelId] = useState(
-    isResponsavel ? loggedResponsavelId : "",
-  );
+  const [responsavelId, setResponsavelId] = useState("");
   const [modalidade, setModalidade] = useState("IDA_E_VOLTA");
   const [mesmoEndereco, setMesmoEndereco] = useState(false);
 
@@ -85,21 +96,23 @@ export default function AlunoFormScreen() {
 
   const [nomeContatoEntrega, setNomeContatoEntrega] = useState("");
   const [telefoneContatoEntrega, setTelefoneContatoEntrega] = useState("");
-  const [diaVencimento, setDiaVencimento] = useState("");
+  const [diaVencimento, setDiaVencimento] = useState("10");
 
   const [formError, setFormError] = useState("");
 
-  useEffect(() => {
-    navigation.setOptions({
-      title: isEditMode ? "Editar Aluno" : "Cadastrar Aluno",
-    });
-  }, [isEditMode, navigation]);
+  // Modal para cadastrar novo responsável diretamente pelo motorista
+  const [novoRespModalVisible, setNovoRespModalVisible] = useState(false);
+  const [novoRespNome, setNovoRespNome] = useState("");
+  const [novoRespTelefone, setNovoRespTelefone] = useState("");
+  const [novoRespEmail, setNovoRespEmail] = useState("");
+  const [novoRespErro, setNovoRespErro] = useState("");
+  const [criandoResp, setCriandoResp] = useState(false);
 
   useEffect(() => {
-    if (!isEditMode && isResponsavel && loggedResponsavelId) {
-      setResponsavelId(loggedResponsavelId);
-    }
-  }, [isEditMode, isResponsavel, loggedResponsavelId]);
+    navigation.setOptions({
+      title: isEditMode ? "Editar Aluno" : "Novo Aluno",
+    });
+  }, [isEditMode, navigation]);
 
   useEffect(() => {
     if (!alunoDetalhe) return;
@@ -137,11 +150,15 @@ export default function AlunoFormScreen() {
     );
 
     setNomeContatoEntrega(alunoDetalhe.nomeContatoEntrega || "");
-    setTelefoneContatoEntrega(alunoDetalhe.telefoneContatoEntrega || "");
+    setTelefoneContatoEntrega(
+      alunoDetalhe.telefoneContatoEntrega
+        ? mascaraTelefone(alunoDetalhe.telefoneContatoEntrega)
+        : "",
+    );
     setDiaVencimento(
       alunoDetalhe.diaVencimentoMensalidade != null
         ? String(alunoDetalhe.diaVencimentoMensalidade)
-        : "",
+        : "10",
     );
   }, [alunoDetalhe]);
 
@@ -160,28 +177,121 @@ export default function AlunoFormScreen() {
     }
   };
 
+  const handleCriarNovoResponsavel = async () => {
+    setNovoRespErro("");
+    if (!novoRespNome.trim() || novoRespNome.trim().length < 2) {
+      setNovoRespErro("Informe o nome do responsável.");
+      return;
+    }
+    const erroTel = validarTelefone(novoRespTelefone);
+    if (erroTel) {
+      setNovoRespErro(erroTel);
+      return;
+    }
+    const emailFinal =
+      novoRespEmail.trim().toLowerCase() ||
+      `resp.${Date.now()}@fillmore.app`;
+    if (novoRespEmail.trim()) {
+      const erroMail = validarEmail(emailFinal);
+      if (erroMail) {
+        setNovoRespErro(erroMail);
+        return;
+      }
+    }
+
+    setCriandoResp(true);
+    try {
+      const criado = await signUpRequest({
+        nome: novoRespNome.trim(),
+        username: novoRespNome.trim(),
+        email: emailFinal,
+        telefone: novoRespTelefone.trim(),
+        senha: `Resp@${String(Date.now()).slice(-6)}`,
+        tipo: "RESPONSAVEL",
+      });
+
+      const novoId = criado?.responsavel?.id || criado?.user?.responsavel?.id;
+      if (novoId) {
+        if (userId) {
+          await registrarResponsavelDoMotoristaLocal(userId, novoId);
+        }
+        setResponsavelId(novoId);
+      }
+      await queryClient.invalidateQueries({
+        queryKey: ALUNOS_KEYS.responsaveis,
+      });
+      if (!nomeContatoEntrega.trim()) {
+        setNomeContatoEntrega(novoRespNome.trim());
+      }
+      if (!telefoneContatoEntrega.trim()) {
+        setTelefoneContatoEntrega(mascaraTelefone(novoRespTelefone));
+      }
+
+      setNovoRespModalVisible(false);
+      setNovoRespNome("");
+      setNovoRespTelefone("");
+      setNovoRespEmail("");
+      showSnackbar("Responsável cadastrado e selecionado!", "success");
+    } catch (err) {
+      setNovoRespErro(
+        err?.friendlyMessage ||
+          "Não foi possível cadastrar o responsável. Verifique se o e-mail já existe.",
+      );
+    } finally {
+      setCriandoResp(false);
+    }
+  };
+
+  const handleNextStep1 = () => {
+    setFormError("");
+    if (!nome.trim() || nome.trim().length < 2) {
+      setFormError("Informe o nome completo do aluno.");
+      return;
+    }
+    if (!escola.trim() || escola.trim().length < 2) {
+      setFormError("Informe o nome da escola do aluno.");
+      return;
+    }
+    setEtapa(2);
+  };
+
+  const handleNextStep2 = () => {
+    setFormError("");
+    if (!responsavelId.trim()) {
+      setFormError(
+        "Selecione um responsável da lista ou toque em 'Cadastrar novo responsável'.",
+      );
+      return;
+    }
+    setEtapa(3);
+  };
+
+  const handleNextStep3 = () => {
+    setFormError("");
+    if (!enderecoEmbarque.trim() && !enderecoDesembarque.trim()) {
+      setFormError("Informe ao menos o endereço de embarque do aluno.");
+      return;
+    }
+    if (telefoneContatoEntrega.trim()) {
+      const erroTel = validarTelefone(telefoneContatoEntrega);
+      if (erroTel) {
+        setFormError(erroTel);
+        return;
+      }
+    }
+    setEtapa(4);
+  };
+
   const handleSubmit = async () => {
     setFormError("");
 
-    if (!nome.trim()) {
-      return setFormError("O nome do aluno é obrigatório.");
-    }
-    if (!escola.trim()) {
-      return setFormError("O nome da escola é obrigatório.");
-    }
-    if (!responsavelId.trim()) {
-      return setFormError("Selecione um responsável legal para o aluno.");
+    const erroDia = validarDiaVencimento(diaVencimento, { obrigatorio: true });
+    if (erroDia) {
+      setFormError(erroDia);
+      return;
     }
 
-    let diaVencParsed = null;
-    if (diaVencimento.trim()) {
-      diaVencParsed = Number.parseInt(diaVencimento.trim(), 10);
-      if (Number.isNaN(diaVencParsed) || diaVencParsed < 1 || diaVencParsed > 31) {
-        return setFormError(
-          "O dia de vencimento da mensalidade deve estar entre 1 e 31.",
-        );
-      }
-    }
+    const diaVencParsed = Number.parseInt(diaVencimento.trim(), 10);
 
     const endEmbFinal = enderecoEmbarque.trim() || null;
     const endDesFinal = mesmoEndereco
@@ -191,14 +301,21 @@ export default function AlunoFormScreen() {
     let latEmb = endEmbFinal ? parseOptionalFloat(latitudeEmbarque) : null;
     let lngEmb = endEmbFinal ? parseOptionalFloat(longitudeEmbarque) : null;
     let latDes = endDesFinal
-      ? parseOptionalFloat(mesmoEndereco ? latitudeEmbarque : latitudeDesembarque)
+      ? parseOptionalFloat(
+          mesmoEndereco ? latitudeEmbarque : latitudeDesembarque,
+        )
       : null;
     let lngDes = endDesFinal
-      ? parseOptionalFloat(mesmoEndereco ? longitudeEmbarque : longitudeDesembarque)
+      ? parseOptionalFloat(
+          mesmoEndereco ? longitudeEmbarque : longitudeDesembarque,
+        )
       : null;
 
-    const embMudou = !isEditMode || endEmbFinal !== (alunoDetalhe?.enderecoEmbarque || null);
-    const desMudou = !isEditMode || endDesFinal !== (alunoDetalhe?.enderecoDesembarque || null);
+    const embMudou =
+      !isEditMode || endEmbFinal !== (alunoDetalhe?.enderecoEmbarque || null);
+    const desMudou =
+      !isEditMode ||
+      endDesFinal !== (alunoDetalhe?.enderecoDesembarque || null);
 
     setGeocodificando(true);
     try {
@@ -211,7 +328,10 @@ export default function AlunoFormScreen() {
       if (mesmoEndereco) {
         latDes = latEmb;
         lngDes = lngEmb;
-      } else if (endDesFinal && (desMudou || latDes === null || lngDes === null)) {
+      } else if (
+        endDesFinal &&
+        (desMudou || latDes === null || lngDes === null)
+      ) {
         const geoDes = await geocodificarEndereco(endDesFinal);
         latDes = geoDes?.latitude ?? null;
         lngDes = geoDes?.longitude ?? null;
@@ -261,6 +381,11 @@ export default function AlunoFormScreen() {
     );
   }
 
+  const responsavelSelecionado = responsaveis.find(
+    (r) => r.responsavel?.id === responsavelId,
+  );
+  const modInfo = MODALIDADES[modalidade] || MODALIDADES.IDA_E_VOLTA;
+
   return (
     <KeyboardAvoidingView
       style={styles.keyboardView}
@@ -270,237 +395,541 @@ export default function AlunoFormScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
+        {/* Cabeçalho de Progresso */}
+        <Surface style={styles.stepHeaderCard} elevation={1}>
+          <View style={styles.stepHeaderTop}>
+            <Text variant="labelLarge" style={styles.stepTag}>
+              ETAPA {etapa} DE 4
+            </Text>
+            <Text variant="bodySmall" style={styles.stepSubtitle}>
+              {etapa === 1
+                ? "Aluno e Escola"
+                : etapa === 2
+                  ? "Responsável e Modalidade"
+                  : etapa === 3
+                    ? "Endereços de Embarque e Desembarque"
+                    : "Vencimento e Revisão"}
+            </Text>
+          </View>
+          <ProgressBar
+            progress={etapa / 4}
+            color={colors.primary}
+            style={styles.progressBar}
+          />
+        </Surface>
+
         <Surface style={styles.formCard} elevation={1}>
-          {/* 1. Identificação e Modalidade */}
-          <Text variant="titleMedium" style={styles.sectionTitle}>
-            1. Dados Escolares do Aluno
-          </Text>
-
-          <TextInput
-            label="Nome Completo do Aluno *"
-            placeholder="Ex.: Lucas Ferreira"
-            mode="outlined"
-            value={nome}
-            onChangeText={setNome}
-            left={<TextInput.Icon icon="account-school" />}
-            style={styles.input}
-          />
-
-          <TextInput
-            label="Escola *"
-            placeholder="Ex.: Colégio Damas / Marista São Luís"
-            mode="outlined"
-            value={escola}
-            onChangeText={setEscola}
-            left={<TextInput.Icon icon="school-outline" />}
-            style={styles.input}
-          />
-
-          <Text variant="labelLarge" style={styles.fieldLabel}>
-            Modalidade Contratada *
-          </Text>
-          <SegmentedButtons
-            value={modalidade}
-            onValueChange={setModalidade}
-            density="small"
-            buttons={[
-              { value: "IDA_E_VOLTA", label: "Ida e Volta" },
-              { value: "APENAS_IDA", label: "Só Ida" },
-              { value: "APENAS_VOLTA", label: "Só Volta" },
-            ]}
-            style={styles.segmented}
-          />
-
-          <TextInput
-            label="Dia de Vencimento da Mensalidade (1 a 31)"
-            placeholder="Ex.: 10"
-            mode="outlined"
-            keyboardType="numeric"
-            value={diaVencimento}
-            onChangeText={setDiaVencimento}
-            left={<TextInput.Icon icon="calendar-today" />}
-            style={styles.input}
-          />
-
-          <Divider style={styles.divider} />
-
-          {/* 2. Responsável Legal */}
-          <Text variant="titleMedium" style={styles.sectionTitle}>
-            2. Responsável Legal
-          </Text>
-
-          {isResponsavel ? (
-            <Surface style={styles.lockedRespBox} elevation={0}>
-              <MaterialCommunityIcons
-                name="shield-account"
-                size={20}
-                color={colors.secondary}
-              />
-              <View style={{ flex: 1 }}>
-                <Text variant="labelLarge" style={styles.lockedRespName}>
-                  {user?.nome || "Responsável Autenticado"}
-                </Text>
-                <Text variant="labelSmall" style={styles.lockedRespSub}>
-                  Vínculo automático ao seu perfil de responsável
-                </Text>
-              </View>
-            </Surface>
-          ) : (
+          {etapa === 1 ? (
             <>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                1. Aluno e Escola
+              </Text>
+              <Text variant="bodySmall" style={styles.helperCopy}>
+                Informe o nome completo da criança e o colégio onde estuda.
+              </Text>
+
+              <TextInput
+                label="Nome Completo do Aluno *"
+                placeholder="Ex.: Lucas Ferreira"
+                mode="outlined"
+                value={nome}
+                onChangeText={(v) => {
+                  setNome(v);
+                  if (formError) setFormError("");
+                }}
+                left={<TextInput.Icon icon="account-school" />}
+                style={styles.input}
+              />
+
+              <TextInput
+                label="Escola *"
+                placeholder="Ex.: Colégio Santa Maria / Damas"
+                mode="outlined"
+                value={escola}
+                onChangeText={(v) => {
+                  setEscola(v);
+                  if (formError) setFormError("");
+                }}
+                left={<TextInput.Icon icon="school-outline" />}
+                style={styles.input}
+              />
+
+              {formError ? (
+                <HelperText type="error" visible style={styles.errorText}>
+                  {formError}
+                </HelperText>
+              ) : null}
+
+              <View style={styles.actionsRow}>
+                <Button
+                  mode="outlined"
+                  onPress={() => router.back()}
+                  style={styles.backBtn}
+                  contentStyle={styles.secondaryBtnContent}
+                  textColor={colors.secondary}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  mode="contained"
+                  icon="arrow-right"
+                  contentStyle={[
+                    styles.primaryBtnContent,
+                    { flexDirection: "row-reverse" },
+                  ]}
+                  style={styles.primaryBtn}
+                  buttonColor={colors.primary}
+                  textColor={colors.text}
+                  labelStyle={styles.primaryBtnLabel}
+                  onPress={handleNextStep1}
+                >
+                  Continuar
+                </Button>
+              </View>
+            </>
+          ) : null}
+
+          {etapa === 2 ? (
+            <>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                2. Responsável e Modalidade
+              </Text>
+              <Text variant="bodySmall" style={styles.helperCopy}>
+                Selecione o responsável pelo aluno (para avisos e cobranças via
+                WhatsApp) ou cadastre um novo agora mesmo.
+              </Text>
+
               {loadingResponsaveis ? (
                 <ActivityIndicator
                   size="small"
                   color={colors.primary}
-                  style={styles.smallLoader}
+                  style={{ marginVertical: 12 }}
                 />
-              ) : responsaveis.length > 0 ? (
-                <>
-                  <Text variant="bodySmall" style={styles.helperCopy}>
-                    Selecione um responsável cadastrado:
-                  </Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.respChipsRow}
-                  >
-                    {responsaveis.map((respUser) => {
-                      const rId = respUser.responsavel?.id;
-                      const selected = responsavelId === rId;
-                      return (
-                        <Chip
-                          key={rId}
-                          selected={selected}
-                          icon="account-tie"
-                          onPress={() => setResponsavelId(rId)}
-                          style={[
-                            styles.respChip,
-                            selected && styles.respChipSelected,
-                          ]}
-                          textStyle={
-                            selected ? styles.respChipTextSelected : undefined
-                          }
-                        >
-                          {respUser.nome}
-                        </Chip>
-                      );
-                    })}
-                  </ScrollView>
-                </>
               ) : (
-                <Text variant="bodySmall" style={styles.helperCopy}>
-                  Nenhum responsável cadastrado ainda. Peça ao responsável para
-                  criar uma conta no aplicativo antes de vincular o aluno.
-                </Text>
+                <View style={styles.respSection}>
+                  {responsaveis.length > 0 ? (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.respChipsRow}
+                    >
+                      {responsaveis.map((respUser) => {
+                        const rId = respUser.responsavel?.id;
+                        const selected = responsavelId === rId;
+                        return (
+                          <Chip
+                            key={rId}
+                            selected={selected}
+                            icon="account-tie"
+                            onPress={() => {
+                              setResponsavelId(rId);
+                              if (!nomeContatoEntrega) {
+                                setNomeContatoEntrega(respUser.nome || "");
+                              }
+                              if (!telefoneContatoEntrega && respUser.telefone) {
+                                setTelefoneContatoEntrega(
+                                  mascaraTelefone(respUser.telefone),
+                                );
+                              }
+                              if (formError) setFormError("");
+                            }}
+                            style={[
+                              styles.respChip,
+                              selected && styles.respChipSelected,
+                            ]}
+                            textStyle={
+                              selected ? styles.respChipTextSelected : undefined
+                            }
+                          >
+                            {respUser.nome}
+                          </Chip>
+                        );
+                      })}
+                    </ScrollView>
+                  ) : (
+                    <Text variant="bodySmall" style={styles.helperCopy}>
+                      Nenhum responsável cadastrado ainda.
+                    </Text>
+                  )}
+
+                  <Button
+                    mode="contained-tonal"
+                    icon="account-plus-outline"
+                    buttonColor={colors.primaryLight}
+                    textColor={colors.text}
+                    style={styles.newRespBtn}
+                    contentStyle={styles.secondaryBtnContent}
+                    onPress={() => setNovoRespModalVisible(true)}
+                  >
+                    Cadastrar novo responsável
+                  </Button>
+                </View>
               )}
+
+              <Divider style={styles.divider} />
+
+              <Text variant="labelLarge" style={styles.fieldLabel}>
+                Modalidade Contratada *
+              </Text>
+              <SegmentedButtons
+                value={modalidade}
+                onValueChange={setModalidade}
+                density="small"
+                buttons={[
+                  { value: "IDA_E_VOLTA", label: "Ida e Volta" },
+                  { value: "APENAS_IDA", label: "Só Ida" },
+                  { value: "APENAS_VOLTA", label: "Só Volta" },
+                ]}
+                style={styles.segmented}
+              />
+
+              {formError ? (
+                <HelperText type="error" visible style={styles.errorText}>
+                  {formError}
+                </HelperText>
+              ) : null}
+
+              <View style={styles.actionsRow}>
+                <Button
+                  mode="outlined"
+                  icon="arrow-left"
+                  onPress={() => setEtapa(1)}
+                  style={styles.backBtn}
+                  contentStyle={styles.secondaryBtnContent}
+                  textColor={colors.secondary}
+                >
+                  Voltar
+                </Button>
+                <Button
+                  mode="contained"
+                  icon="arrow-right"
+                  contentStyle={[
+                    styles.primaryBtnContent,
+                    { flexDirection: "row-reverse" },
+                  ]}
+                  style={styles.primaryBtn}
+                  buttonColor={colors.primary}
+                  textColor={colors.text}
+                  labelStyle={styles.primaryBtnLabel}
+                  onPress={handleNextStep2}
+                >
+                  Continuar
+                </Button>
+              </View>
             </>
-          )}
-
-          <Divider style={styles.divider} />
-
-          {/* 3. Guarda Compartilhada (Endereços Independentes) */}
-          <Text variant="titleMedium" style={styles.sectionTitle}>
-            3. Guarda Compartilhada (Embarque & Desembarque)
-          </Text>
-          <Text variant="bodySmall" style={styles.helperCopy}>
-            Permite definir endereços distintos para buscar pela manhã e entregar
-            à tarde (ex.: casa da mãe e casa do pai/avós).
-          </Text>
-
-          <View style={styles.switchRow}>
-            <Text variant="bodyMedium" style={styles.switchLabel}>
-              Mesmo endereço para ida e volta
-            </Text>
-            <Switch
-              value={mesmoEndereco}
-              onValueChange={handleToggleMesmoEndereco}
-              color={colors.primary}
-            />
-          </View>
-
-          <TextInput
-            label="Endereço de Embarque (Casa 1)"
-            placeholder="Ex.: Av. Boa Viagem, 1500 - Apto 402"
-            mode="outlined"
-            value={enderecoEmbarque}
-            onChangeText={(txt) => {
-              setEnderecoEmbarque(txt);
-              if (mesmoEndereco) setEnderecoDesembarque(txt);
-            }}
-            left={<TextInput.Icon icon="home-export-outline" />}
-            style={styles.input}
-          />
-
-          {!mesmoEndereco && (
-            <TextInput
-              label="Endereço de Desembarque (Casa 2 / Guarda)"
-              placeholder="Ex.: Rua do Espinheiro, 410"
-              mode="outlined"
-              value={enderecoDesembarque}
-              onChangeText={setEnderecoDesembarque}
-              left={<TextInput.Icon icon="home-import-outline" />}
-              style={styles.input}
-            />
-          )}
-
-          <Divider style={styles.divider} />
-
-          {/* 4. Contato de Entrega */}
-          <Text variant="titleMedium" style={styles.sectionTitle}>
-            4. Contato Autorizado na Entrega
-          </Text>
-
-          <TextInput
-            label="Nome do Contato de Entrega"
-            placeholder="Ex.: Avó Maria / Porteiro Carlos"
-            mode="outlined"
-            value={nomeContatoEntrega}
-            onChangeText={setNomeContatoEntrega}
-            left={<TextInput.Icon icon="account-check-outline" />}
-            style={styles.input}
-          />
-
-          <TextInput
-            label="Telefone do Contato de Entrega"
-            placeholder="Ex.: (81) 99999-1234"
-            mode="outlined"
-            keyboardType="phone-pad"
-            value={telefoneContatoEntrega}
-            onChangeText={setTelefoneContatoEntrega}
-            left={<TextInput.Icon icon="phone-outline" />}
-            style={styles.input}
-          />
-
-          {formError ? (
-            <HelperText type="error" visible style={styles.errorText}>
-              {formError}
-            </HelperText>
           ) : null}
 
-          <View style={styles.actionsRow}>
-            <Button
+          {etapa === 3 ? (
+            <>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                3. Endereços de Embarque e Desembarque
+              </Text>
+              <Text variant="bodySmall" style={styles.helperCopy}>
+                Permite configurar endereços independentes para buscar pela
+                manhã e entregar à tarde (guarda compartilhada).
+              </Text>
+
+              <View style={styles.switchRow}>
+                <Text variant="bodyMedium" style={styles.switchLabel}>
+                  Mesmo endereço para ida e volta
+                </Text>
+                <Switch
+                  value={mesmoEndereco}
+                  onValueChange={handleToggleMesmoEndereco}
+                  color={colors.primary}
+                />
+              </View>
+
+              <TextInput
+                label="Endereço de Embarque (Manhã) *"
+                placeholder="Ex.: Av. Boa Viagem, 1500 - Boa Viagem"
+                mode="outlined"
+                value={enderecoEmbarque}
+                onChangeText={(txt) => {
+                  setEnderecoEmbarque(txt);
+                  if (mesmoEndereco) setEnderecoDesembarque(txt);
+                  if (formError) setFormError("");
+                }}
+                left={<TextInput.Icon icon="home-export-outline" />}
+                style={styles.input}
+              />
+
+              {!mesmoEndereco ? (
+                <TextInput
+                  label="Endereço de Desembarque (Tarde)"
+                  placeholder="Ex.: Rua da Hora, 310 - Espinheiro"
+                  mode="outlined"
+                  value={enderecoDesembarque}
+                  onChangeText={setEnderecoDesembarque}
+                  left={<TextInput.Icon icon="home-import-outline" />}
+                  style={styles.input}
+                />
+              ) : null}
+
+              <Divider style={styles.divider} />
+
+              <Text variant="labelLarge" style={styles.fieldLabel}>
+                Contato na Entrega (opcional)
+              </Text>
+              <TextInput
+                label="Nome de quem recebe / contato"
+                placeholder="Ex.: Mãe Mariana / Portaria"
+                mode="outlined"
+                value={nomeContatoEntrega}
+                onChangeText={setNomeContatoEntrega}
+                left={<TextInput.Icon icon="account-check-outline" />}
+                style={styles.input}
+              />
+
+              <TextInput
+                label="WhatsApp / Telefone de contato"
+                placeholder="(81) 99999-1234"
+                mode="outlined"
+                keyboardType="phone-pad"
+                value={telefoneContatoEntrega}
+                onChangeText={(v) =>
+                  setTelefoneContatoEntrega(mascaraTelefone(v))
+                }
+                left={<TextInput.Icon icon="whatsapp" />}
+                style={styles.input}
+              />
+
+              {formError ? (
+                <HelperText type="error" visible style={styles.errorText}>
+                  {formError}
+                </HelperText>
+              ) : null}
+
+              <View style={styles.actionsRow}>
+                <Button
+                  mode="outlined"
+                  icon="arrow-left"
+                  onPress={() => setEtapa(2)}
+                  style={styles.backBtn}
+                  contentStyle={styles.secondaryBtnContent}
+                  textColor={colors.secondary}
+                >
+                  Voltar
+                </Button>
+                <Button
+                  mode="contained"
+                  icon="arrow-right"
+                  contentStyle={[
+                    styles.primaryBtnContent,
+                    { flexDirection: "row-reverse" },
+                  ]}
+                  style={styles.primaryBtn}
+                  buttonColor={colors.primary}
+                  textColor={colors.text}
+                  labelStyle={styles.primaryBtnLabel}
+                  onPress={handleNextStep3}
+                >
+                  Revisar
+                </Button>
+              </View>
+            </>
+          ) : null}
+
+          {etapa === 4 ? (
+            <>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                4. Vencimento e Revisão
+              </Text>
+              <Text variant="bodySmall" style={styles.helperCopy}>
+                Defina o dia de vencimento da mensalidade (usado ao gerar
+                faturas do mês em lote) e revise os dados.
+              </Text>
+
+              <TextInput
+                label="Dia de Vencimento da Mensalidade (1 a 31) *"
+                placeholder="Ex.: 10"
+                mode="outlined"
+                keyboardType="number-pad"
+                value={diaVencimento}
+                onChangeText={(v) => {
+                  setDiaVencimento(v.replace(/\D/g, "").slice(0, 2));
+                  if (formError) setFormError("");
+                }}
+                left={<TextInput.Icon icon="calendar-today" />}
+                style={styles.input}
+              />
+
+              <View style={styles.reviewBox}>
+                <View style={styles.reviewRow}>
+                  <MaterialCommunityIcons
+                    name="account-school"
+                    size={20}
+                    color={colors.primaryDark}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="labelSmall" style={styles.reviewLabel}>
+                      ALUNO & ESCOLA
+                    </Text>
+                    <Text variant="titleMedium" style={styles.reviewValue}>
+                      {nome.trim()} • {escola.trim()}
+                    </Text>
+                  </View>
+                </View>
+
+                <Divider style={styles.reviewDivider} />
+
+                <View style={styles.reviewRow}>
+                  <MaterialCommunityIcons
+                    name="account-tie"
+                    size={20}
+                    color={colors.secondary}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="labelSmall" style={styles.reviewLabel}>
+                      RESPONSÁVEL & MODALIDADE
+                    </Text>
+                    <Text variant="bodyMedium" style={styles.reviewValue}>
+                      {responsavelSelecionado?.nome || "Selecionado"} •{" "}
+                      {modInfo.label}
+                    </Text>
+                  </View>
+                </View>
+
+                <Divider style={styles.reviewDivider} />
+
+                <View style={styles.reviewRow}>
+                  <MaterialCommunityIcons
+                    name="map-marker-outline"
+                    size={20}
+                    color={colors.success}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="labelSmall" style={styles.reviewLabel}>
+                      ENDEREÇOS
+                    </Text>
+                    <Text variant="bodySmall" style={styles.reviewValue}>
+                      Embarque: {enderecoEmbarque.trim() || "—"}
+                    </Text>
+                    <Text variant="bodySmall" style={styles.reviewValue}>
+                      Desembarque:{" "}
+                      {(mesmoEndereco
+                        ? enderecoEmbarque.trim()
+                        : enderecoDesembarque.trim()) || "—"}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {formError ? (
+                <HelperText type="error" visible style={styles.errorText}>
+                  {formError}
+                </HelperText>
+              ) : null}
+
+              <View style={styles.actionsRow}>
+                <Button
+                  mode="outlined"
+                  icon="arrow-left"
+                  onPress={() => setEtapa(3)}
+                  disabled={isSubmitting}
+                  style={styles.backBtn}
+                  contentStyle={styles.secondaryBtnContent}
+                  textColor={colors.secondary}
+                >
+                  Voltar
+                </Button>
+
+                <Button
+                  mode="contained"
+                  icon="check-bold"
+                  onPress={handleSubmit}
+                  loading={isSubmitting}
+                  disabled={isSubmitting}
+                  style={styles.primaryBtn}
+                  contentStyle={styles.primaryBtnContent}
+                  buttonColor={colors.primary}
+                  textColor={colors.text}
+                  labelStyle={styles.primaryBtnLabel}
+                >
+                  Salvar aluno
+                </Button>
+              </View>
+            </>
+          ) : null}
+        </Surface>
+      </ScrollView>
+
+      {/* Modal: Cadastrar Novo Responsável sem sair do wizard */}
+      <Portal>
+        <Dialog
+          visible={novoRespModalVisible}
+          onDismiss={() => !criandoResp && setNovoRespModalVisible(false)}
+          style={styles.dialog}
+        >
+          <Dialog.Title style={styles.dialogTitle}>
+            Novo Responsável
+          </Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodySmall" style={styles.helperCopy}>
+              Cadastre rapidamente os dados de contato do pai, mãe ou
+              responsável para avisos no WhatsApp.
+            </Text>
+
+            <TextInput
+              label="Nome do Responsável *"
+              placeholder="Ex.: Carlos Silva"
               mode="outlined"
-              onPress={() => router.back()}
-              disabled={isSubmitting}
-              style={styles.cancelBtn}
-              textColor={colors.secondary}
+              dense
+              value={novoRespNome}
+              onChangeText={setNovoRespNome}
+              style={styles.input}
+            />
+
+            <TextInput
+              label="WhatsApp / Telefone *"
+              placeholder="(81) 99999-1234"
+              mode="outlined"
+              dense
+              keyboardType="phone-pad"
+              value={novoRespTelefone}
+              onChangeText={(v) => setNovoRespTelefone(mascaraTelefone(v))}
+              style={styles.input}
+            />
+
+            <TextInput
+              label="E-mail (opcional)"
+              placeholder="carlos@email.com"
+              mode="outlined"
+              dense
+              keyboardType="email-address"
+              autoCapitalize="none"
+              value={novoRespEmail}
+              onChangeText={setNovoRespEmail}
+              style={styles.input}
+            />
+
+            {novoRespErro ? (
+              <HelperText type="error" visible>
+                {novoRespErro}
+              </HelperText>
+            ) : null}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              onPress={() => setNovoRespModalVisible(false)}
+              disabled={criandoResp}
+              textColor={colors.textSecondary}
             >
               Cancelar
             </Button>
             <Button
               mode="contained"
-              icon={isEditMode ? "content-save-edit" : "check-bold"}
-              onPress={handleSubmit}
-              loading={isSubmitting}
-              disabled={isSubmitting}
-              style={styles.submitBtn}
               buttonColor={colors.primary}
-              textColor={colors.secondary}
+              textColor={colors.text}
+              loading={criandoResp}
+              disabled={criandoResp}
+              onPress={handleCriarNovoResponsavel}
             >
-              {isEditMode ? "Salvar Alterações" : "Cadastrar Aluno"}
+              Salvar responsável
             </Button>
-          </View>
-        </Surface>
-      </ScrollView>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </KeyboardAvoidingView>
   );
 }
@@ -513,6 +942,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 40,
+    gap: 14,
   },
   loadingContainer: {
     flex: 1,
@@ -522,6 +952,32 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: colors.textSecondary,
+  },
+  stepHeaderCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 8,
+  },
+  stepHeaderTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  stepTag: {
+    fontWeight: "800",
+    color: colors.primaryDark,
+  },
+  stepSubtitle: {
+    fontWeight: "700",
+    color: colors.secondary,
+  },
+  progressBar: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.surfaceVariant,
   },
   formCard: {
     backgroundColor: colors.surface,
@@ -533,7 +989,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontWeight: "800",
     color: colors.secondary,
-    marginBottom: 10,
+    marginBottom: 4,
+  },
+  helperCopy: {
+    color: colors.textSecondary,
+    marginBottom: 14,
+    lineHeight: 18,
   },
   fieldLabel: {
     color: colors.secondary,
@@ -550,17 +1011,12 @@ const styles = StyleSheet.create({
   divider: {
     marginVertical: 14,
   },
-  helperCopy: {
-    color: colors.textSecondary,
-    marginBottom: 8,
-    lineHeight: 18,
-  },
-  smallLoader: {
-    marginVertical: 8,
+  respSection: {
+    gap: 10,
   },
   respChipsRow: {
     gap: 8,
-    paddingBottom: 6,
+    paddingBottom: 4,
   },
   respChip: {
     backgroundColor: colors.surfaceVariant,
@@ -574,24 +1030,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.secondary,
   },
-  lockedRespBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: colors.surfaceVariant,
-    padding: 12,
+  newRespBtn: {
     borderRadius: 12,
-  },
-  lockedRespName: {
-    fontWeight: "700",
-    color: colors.secondary,
-  },
-  lockedRespSub: {
-    color: colors.textSecondary,
-  },
-  toggleLink: {
-    alignSelf: "flex-start",
-    marginBottom: 6,
   },
   switchRow: {
     flexDirection: "row",
@@ -608,31 +1048,30 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     flex: 1,
   },
-  gpsSection: {
+  reviewBox: {
     backgroundColor: colors.background,
-    padding: 12,
-    borderRadius: 12,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
     borderColor: colors.border,
+    marginBottom: 12,
   },
-  subLabel: {
+  reviewRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  reviewLabel: {
+    color: colors.textSecondary,
+    fontWeight: "700",
+  },
+  reviewValue: {
     color: colors.secondary,
     fontWeight: "700",
-    marginBottom: 6,
+    marginTop: 2,
   },
-  presetRow: {
-    gap: 6,
-    marginBottom: 8,
-  },
-  presetChip: {
-    backgroundColor: colors.primaryLight,
-  },
-  row: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  halfInput: {
-    flex: 1,
+  reviewDivider: {
+    marginVertical: 10,
   },
   errorText: {
     fontWeight: "700",
@@ -640,16 +1079,34 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     flexDirection: "row",
-    justifyContent: "flex-end",
+    alignItems: "center",
     gap: 10,
     marginTop: 12,
   },
-  cancelBtn: {
-    borderRadius: 10,
+  backBtn: {
+    borderRadius: 12,
     borderColor: colors.border,
   },
-  submitBtn: {
-    borderRadius: 10,
+  secondaryBtnContent: {
+    minHeight: 48,
+  },
+  primaryBtn: {
     flex: 1,
+    borderRadius: 12,
+  },
+  primaryBtnContent: {
+    height: 52,
+  },
+  primaryBtnLabel: {
+    fontWeight: "800",
+    fontSize: 15,
+  },
+  dialog: {
+    backgroundColor: colors.surface,
+    borderRadius: 18,
+  },
+  dialogTitle: {
+    fontWeight: "800",
+    color: colors.secondary,
   },
 });

@@ -1,38 +1,13 @@
 import React from "react";
-import { TouchableOpacity } from "react-native";
-import { Tabs, useRouter } from "expo-router";
+import { Tabs } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { colors } from "../../theme";
+import HeaderPerfilButton from "../../components/HeaderPerfilButton";
 
-/**
- * Navegação Principal em Abas (5 abas principais; Perfil e Sobre acessíveis pelo cabeçalho/Home)
- */
+// Navegação principal motorista-only: exatamente 4 abas (Hoje, Rotas, Alunos, Financeiro)
+// Perfil (/perfil) e Sobre (/sobre) ficam na Stack raiz (src/app/_layout.js) para evitar colisão de rotas no Expo Router.
 export default function TabsLayout() {
-  const router = useRouter();
-
-  const renderPerfilHeaderButton = () => (
-    <TouchableOpacity
-      onPress={() => router.push("/(tabs)/perfil")}
-      style={{ marginRight: 14, padding: 4 }}
-      accessibilityLabel="Abrir Meu Perfil"
-    >
-      <MaterialCommunityIcons
-        name="account-circle-outline"
-        size={26}
-        color="#FFFFFF"
-      />
-    </TouchableOpacity>
-  );
-
-  const renderVoltarHomeButton = () => (
-    <TouchableOpacity
-      onPress={() => router.replace("/(tabs)")}
-      style={{ marginLeft: 14, padding: 4 }}
-      accessibilityLabel="Voltar para Início"
-    >
-      <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
-    </TouchableOpacity>
-  );
+  const renderPerfilAvatarButton = () => <HeaderPerfilButton />;
 
   return (
     <Tabs
@@ -44,30 +19,30 @@ export default function TabsLayout() {
         headerTitleStyle: {
           fontWeight: "800",
         },
-        headerRight: renderPerfilHeaderButton,
+        headerRight: renderPerfilAvatarButton,
         tabBarActiveTintColor: colors.primaryDark,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
-          height: 62,
+          height: 64,
           paddingBottom: 8,
           paddingTop: 6,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: "700",
         },
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="hoje"
         options={{
-          title: "Início",
-          headerTitle: "Fillmore • Painel Escolar",
+          title: "Hoje",
+          headerTitle: "Fillmore • Hoje",
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
-              name="view-dashboard-outline"
+              name="calendar-check-outline"
               size={size}
               color={color}
             />
@@ -109,7 +84,7 @@ export default function TabsLayout() {
         name="financeiro/index"
         options={{
           title: "Financeiro",
-          headerTitle: "Mensalidades & Pix",
+          headerTitle: "Financeiro & Pix",
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
               name="cash-multiple"
@@ -117,42 +92,6 @@ export default function TabsLayout() {
               color={color}
             />
           ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="operacao/index"
-        options={{
-          title: "Operação",
-          headerTitle: "Diário de Bordo",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="clipboard-check-outline"
-              size={size}
-              color={color}
-            />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="perfil/index"
-        options={{
-          href: null,
-          title: "Perfil",
-          headerTitle: "Meu Perfil",
-          headerLeft: renderVoltarHomeButton,
-          headerRight: () => null,
-        }}
-      />
-
-      <Tabs.Screen
-        name="sobre"
-        options={{
-          href: null,
-          title: "Sobre",
-          headerTitle: "Sobre o Projeto & Equipe",
-          headerLeft: renderVoltarHomeButton,
         }}
       />
     </Tabs>

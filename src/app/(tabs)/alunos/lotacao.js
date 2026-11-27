@@ -112,6 +112,15 @@ export default function LotacaoRotaScreen() {
 
   const handleVincularAluno = async (aluno) => {
     if (!rotaSelecionada) return;
+    if (isLotada) {
+      setPickerVisible(false);
+      setLotacaoConflito({
+        message: `A van já atingiu a capacidade máxima (${vagasOcupadas}/${capacidadeMaxima} vagas) nesta rota. Desvincule um passageiro ou aumente a capacidade no Perfil.`,
+        rota: rotaSelecionada,
+        aluno,
+      });
+      return;
+    }
     const tipoTrajeto = rotaSelecionada.turno === "TARDE" ? "VOLTA" : "IDA";
     try {
       await vincularMutation.mutateAsync({
@@ -146,18 +155,6 @@ export default function LotacaoRotaScreen() {
       setAlunoParaDesvincular(null);
     }
   };
-
-  if (!isMotorista) {
-    return (
-      <View style={styles.centered}>
-        <EmptyState
-          icon="shield-lock-outline"
-          title="Acesso Restrito ao Motorista"
-          description="A gestão de lotação e vínculo de alunos às rotas é realizada pelo motorista da van."
-        />
-      </View>
-    );
-  }
 
   if (rotasQuery.isLoading) {
     return (
@@ -400,12 +397,12 @@ export default function LotacaoRotaScreen() {
                         mode="contained"
                         compact
                         buttonColor={colors.primary}
-                        textColor={colors.secondary}
+                        textColor={colors.text}
                         loading={vincularMutation.isPending}
-                        disabled={vincularMutation.isPending}
+                        disabled={vincularMutation.isPending || isLotada}
                         onPress={() => handleVincularAluno(aluno)}
                       >
-                        Vincular
+                        {isLotada ? "Lotada" : "Vincular"}
                       </Button>
                     </View>
                     {idx < alunosDisponiveis.length - 1 && <Divider />}
@@ -545,7 +542,7 @@ const styles = StyleSheet.create({
     color: colors.secondary,
   },
   statusChip: {
-    height: 26,
+    borderRadius: 8,
   },
   statusChipOpen: {
     backgroundColor: "#DCFCE7",

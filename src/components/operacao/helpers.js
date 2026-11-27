@@ -1,19 +1,10 @@
-// Utilitários de data, hora e formatação para a Operação Diária
+import { hojeLocal, horaAtualLocal } from "../../utils/format";
 
-export const getHojeISO = () => {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-};
+// Utilitários de data, hora e formatação (usando hojeLocal de Recife UTC-3)
 
-export const getHoraAtual = () => {
-  const now = new Date();
-  const h = String(now.getHours()).padStart(2, "0");
-  const min = String(now.getMinutes()).padStart(2, "0");
-  return `${h}:${min}`;
-};
+export const getHojeISO = () => hojeLocal();
+
+export const getHoraAtual = () => horaAtualLocal();
 
 export const isDataValida = (valor) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false;

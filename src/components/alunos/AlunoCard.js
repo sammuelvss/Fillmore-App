@@ -4,66 +4,36 @@ import {
   Card,
   Text,
   Chip,
-  IconButton,
   Button,
   Divider,
 } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { colors } from "../../theme";
-
-const MODALIDADE_CONFIG = {
-  IDA_E_VOLTA: {
-    label: "Ida e Volta",
-    icon: "swap-horizontal-bold",
-    bg: "#DBEAFE",
-    text: "#1E40AF",
-  },
-  APENAS_IDA: {
-    label: "Apenas Ida (Manhã)",
-    icon: "arrow-right-bold",
-    bg: "#FEF3C7",
-    text: "#92400E",
-  },
-  APENAS_VOLTA: {
-    label: "Apenas Volta (Tarde)",
-    icon: "arrow-left-bold",
-    bg: "#EDE9FE",
-    text: "#5B21B6",
-  },
-};
+import { MODALIDADES } from "../../constants";
 
 /**
- * Card de Aluno com foco em Guarda Compartilhada e Vínculo de Rota (Joao)
+ * Card de Aluno — Fase 4
+ * Destaca claramente a rota atual (ou badge "Sem rota"), escola, responsável
+ * e no máximo 2 ações diretas no rodapé (toque no card abre Detalhe do Aluno).
  */
 export default function AlunoCard({
   aluno,
-  isMotorista = false,
-  onEdit,
-  onDelete,
+  onPress,
   onVincularRota,
-  onDesvincularRota,
-  rotaEmFocoId = null,
+  onWhatsApp,
 }) {
-  const mod =
-    MODALIDADE_CONFIG[aluno.modalidade] || MODALIDADE_CONFIG.IDA_E_VOLTA;
-
-  const temGuardaCompartilhada =
-    Boolean(aluno.enderecoEmbarque) &&
-    Boolean(aluno.enderecoDesembarque) &&
-    aluno.enderecoEmbarque.trim().toLowerCase() !==
-      aluno.enderecoDesembarque.trim().toLowerCase();
-
+  const mod = MODALIDADES[aluno.modalidade] || MODALIDADES.IDA_E_VOLTA;
+  const semRota = !aluno.rotaIda && !aluno.rotaVolta;
   const responsavelNome = aluno.responsavel?.usuario?.nome;
-  const responsavelTel = aluno.responsavel?.usuario?.telefone;
-
-  const vinculadoNaRotaEmFoco =
-    rotaEmFocoId &&
-    (aluno.rotaIdaId === rotaEmFocoId || aluno.rotaVoltaId === rotaEmFocoId);
 
   return (
-    <Card style={styles.card} mode="elevated">
+    <Card
+      style={styles.card}
+      mode="elevated"
+      onPress={() => onPress && onPress(aluno)}
+    >
       <Card.Content>
-        {/* Cabeçalho: Modalidade + Ações */}
+        {/* Cabeçalho: Modalidade + Badge Sem Rota quando aplicável */}
         <View style={styles.headerRow}>
           <View style={styles.badgesLeft}>
             <Chip
@@ -72,38 +42,26 @@ export default function AlunoCard({
               style={[styles.modChip, { backgroundColor: mod.bg }]}
               textStyle={[styles.modChipText, { color: mod.text }]}
             >
-              {mod.label}
+              {mod.shortLabel}
             </Chip>
-            {temGuardaCompartilhada ? (
+
+            {semRota ? (
               <Chip
-                icon="home-switch-outline"
+                icon="alert-circle-outline"
                 compact
-                style={styles.guardaChip}
-                textStyle={styles.guardaChipText}
+                style={styles.semRotaChip}
+                textStyle={styles.semRotaChipText}
               >
-                Guarda Compartilhada
+                Sem rota
               </Chip>
             ) : null}
           </View>
 
-          <View style={styles.actionsRight}>
-            <IconButton
-              icon="pencil-outline"
-              size={20}
-              iconColor={colors.secondary}
-              style={styles.actionIcon}
-              onPress={() => onEdit && onEdit(aluno)}
-              accessibilityLabel="Editar aluno"
-            />
-            <IconButton
-              icon="trash-can-outline"
-              size={20}
-              iconColor={colors.error}
-              style={styles.actionIcon}
-              onPress={() => onDelete && onDelete(aluno)}
-              accessibilityLabel="Excluir aluno"
-            />
-          </View>
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={22}
+            color={colors.textSecondary}
+          />
         </View>
 
         {/* Nome do Aluno e Escola */}
@@ -115,7 +73,11 @@ export default function AlunoCard({
             style={styles.studentIcon}
           />
           <View style={{ flex: 1 }}>
-            <Text variant="titleMedium" style={styles.alunoNome} numberOfLines={2}>
+            <Text
+              variant="titleMedium"
+              style={styles.alunoNome}
+              numberOfLines={2}
+            >
               {aluno.nome}
             </Text>
             <View style={styles.escolaRow}>
@@ -124,7 +86,11 @@ export default function AlunoCard({
                 size={15}
                 color={colors.textSecondary}
               />
-              <Text variant="bodySmall" style={styles.escolaText} numberOfLines={1}>
+              <Text
+                variant="bodySmall"
+                style={styles.escolaText}
+                numberOfLines={1}
+              >
                 {aluno.escola}
               </Text>
               {aluno.diaVencimentoMensalidade ? (
@@ -136,67 +102,23 @@ export default function AlunoCard({
           </View>
         </View>
 
-        {/* Endereços de Embarque e Desembarque (Guarda Compartilhada) */}
-        {(aluno.enderecoEmbarque || aluno.enderecoDesembarque) && (
-          <View style={styles.addressBox}>
-            <View style={styles.addressRow}>
-              <MaterialCommunityIcons
-                name="home-export-outline"
-                size={16}
-                color={colors.success}
-              />
-              <Text variant="bodySmall" style={styles.addressText}>
-                <Text style={styles.addressLabel}>Embarque: </Text>
-                {aluno.enderecoEmbarque || "Não informado"}
-              </Text>
-            </View>
-            <View style={styles.addressRow}>
-              <MaterialCommunityIcons
-                name="home-import-outline"
-                size={16}
-                color={colors.info}
-              />
-              <Text variant="bodySmall" style={styles.addressText}>
-                <Text style={styles.addressLabel}>Desembarque: </Text>
-                {aluno.enderecoDesembarque || "Não informado"}
-              </Text>
-            </View>
+        {/* Responsável */}
+        {responsavelNome ? (
+          <View style={styles.metaRow}>
+            <MaterialCommunityIcons
+              name="account-tie-outline"
+              size={15}
+              color={colors.textSecondary}
+            />
+            <Text
+              variant="bodySmall"
+              style={styles.metaText}
+              numberOfLines={1}
+            >
+              Responsável: {responsavelNome}
+            </Text>
           </View>
-        )}
-
-        {/* Responsável e Contato de Entrega */}
-        {(responsavelNome || aluno.nomeContatoEntrega) && (
-          <View style={styles.metaList}>
-            {responsavelNome ? (
-              <View style={styles.metaItem}>
-                <MaterialCommunityIcons
-                  name="account-tie-outline"
-                  size={15}
-                  color={colors.textSecondary}
-                />
-                <Text variant="labelSmall" style={styles.metaText}>
-                  Responsável: {responsavelNome}
-                  {responsavelTel ? ` (${responsavelTel})` : ""}
-                </Text>
-              </View>
-            ) : null}
-            {aluno.nomeContatoEntrega ? (
-              <View style={styles.metaItem}>
-                <MaterialCommunityIcons
-                  name="phone-check-outline"
-                  size={15}
-                  color={colors.textSecondary}
-                />
-                <Text variant="labelSmall" style={styles.metaText}>
-                  Entrega: {aluno.nomeContatoEntrega}
-                  {aluno.telefoneContatoEntrega
-                    ? ` (${aluno.telefoneContatoEntrega})`
-                    : ""}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        )}
+        ) : null}
 
         {/* Status das Rotas Vinculadas */}
         <View style={styles.rotasRow}>
@@ -219,8 +141,7 @@ export default function AlunoCard({
               ]}
               numberOfLines={1}
             >
-              Ida: {aluno.rotaIda?.nome || "Não vinculada"}
-              {aluno.ordemNaRotaIda ? ` (#${aluno.ordemNaRotaIda})` : ""}
+              Ida: {aluno.rotaIda?.nome || "Sem rota"}
             </Text>
           </View>
 
@@ -243,54 +164,42 @@ export default function AlunoCard({
               ]}
               numberOfLines={1}
             >
-              Volta: {aluno.rotaVolta?.nome || "Não vinculada"}
-              {aluno.ordemNaRotaVolta ? ` (#${aluno.ordemNaRotaVolta})` : ""}
+              Volta: {aluno.rotaVolta?.nome || "Sem rota"}
             </Text>
           </View>
         </View>
 
         <Divider style={styles.divider} />
 
-        {/* Rodapé de Ações */}
+        {/* Rodapé com até 2 ações rápidas (3ª ação é o toque no card para Detalhe) */}
         <View style={styles.footerRow}>
-          {isMotorista && vinculadoNaRotaEmFoco && onDesvincularRota ? (
+          {onWhatsApp ? (
             <Button
               mode="outlined"
-              icon="link-off"
-              compact
-              textColor={colors.error}
-              style={styles.desvincularBtn}
-              onPress={() => onDesvincularRota(aluno)}
+              icon="whatsapp"
+              textColor="#166534"
+              style={styles.whatsappBtn}
+              contentStyle={styles.footerBtnContent}
+              onPress={() => onWhatsApp(aluno)}
             >
-              Desvincular
+              WhatsApp
             </Button>
           ) : null}
 
-          {isMotorista && onVincularRota ? (
+          {onVincularRota ? (
             <Button
-              mode="contained"
+              mode={semRota ? "contained" : "contained-tonal"}
               icon="bus-stop"
-              compact
-              buttonColor={colors.secondary}
-              textColor="#FFFFFF"
+              buttonColor={semRota ? colors.primary : colors.primaryLight}
+              textColor={colors.text}
               style={styles.footerBtn}
+              contentStyle={styles.footerBtnContent}
+              labelStyle={styles.primaryBtnLabel}
               onPress={() => onVincularRota(aluno)}
             >
-              Vincular Rota
+              {semRota ? "Vincular rota" : "Alterar rota"}
             </Button>
           ) : null}
-
-          <Button
-            mode="contained-tonal"
-            icon="pencil"
-            compact
-            buttonColor={colors.primaryLight}
-            textColor="#78350F"
-            style={styles.footerBtn}
-            onPress={() => onEdit && onEdit(aluno)}
-          >
-            Editar
-          </Button>
         </View>
       </Card.Content>
     </Card>
@@ -308,7 +217,7 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
     marginBottom: 8,
     gap: 6,
   },
@@ -325,28 +234,19 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 11,
   },
-  guardaChip: {
+  semRotaChip: {
     borderRadius: 8,
-    backgroundColor: "#DCFCE7",
+    backgroundColor: "#FFEDD5",
   },
-  guardaChipText: {
-    fontWeight: "700",
+  semRotaChipText: {
+    fontWeight: "800",
     fontSize: 11,
-    color: "#166534",
-  },
-  actionsRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginRight: -8,
-    marginTop: -4,
-  },
-  actionIcon: {
-    margin: 0,
+    color: "#9A3412",
   },
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 8,
   },
   studentIcon: {
     marginRight: 10,
@@ -371,37 +271,11 @@ const styles = StyleSheet.create({
     color: colors.primaryDark,
     fontWeight: "700",
   },
-  addressBox: {
-    backgroundColor: colors.background,
-    borderRadius: 10,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 6,
-    marginBottom: 10,
-  },
-  addressRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 6,
-  },
-  addressText: {
-    flex: 1,
-    color: colors.text,
-    lineHeight: 18,
-  },
-  addressLabel: {
-    fontWeight: "700",
-    color: colors.secondary,
-  },
-  metaList: {
-    gap: 4,
-    marginBottom: 10,
-  },
-  metaItem: {
+  metaRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    marginBottom: 10,
   },
   metaText: {
     color: colors.textSecondary,
@@ -409,7 +283,6 @@ const styles = StyleSheet.create({
   },
   rotasRow: {
     gap: 6,
-    marginBottom: 4,
   },
   rotaPill: {
     flexDirection: "row",
@@ -434,19 +307,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   divider: {
-    marginVertical: 10,
+    marginVertical: 12,
   },
   footerRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
-    gap: 8,
+    gap: 10,
+  },
+  whatsappBtn: {
+    flex: 1,
+    borderRadius: 10,
+    borderColor: "#86EFAC",
   },
   footerBtn: {
-    borderRadius: 8,
+    flex: 1,
+    borderRadius: 10,
   },
-  desvincularBtn: {
-    borderRadius: 8,
-    borderColor: "#FCA5A5",
+  footerBtnContent: {
+    minHeight: 48,
+  },
+  primaryBtnLabel: {
+    fontWeight: "800",
   },
 });

@@ -14,22 +14,27 @@ export const useAppStore = create((set) => ({
   rotaAtiva: null,
   setRotaAtiva: (rotaAtiva) => set({ rotaAtiva }),
 
-  // Aluno atualmente selecionado (Relacionamento 2 - Paulo / Presença - Edmundo)
+  // Aluno atualmente selecionado
   alunoAtivo: null,
   setAlunoAtivo: (alunoAtivo) => set({ alunoAtivo }),
 
-  // Snackbar global para exibir feedbacks rápidos de sucesso ou erro da API
+  // Limpa seleções operacionais no logout ou quando a sessão expira (401)
+  resetOperacional: () => set({ rotaAtiva: null, alunoAtivo: null }),
+
+  // Snackbar global para feedback (com suporte opcional a ação de "Desfazer")
   snackbar: {
     visible: false,
     message: "",
     type: "info", // "info" | "success" | "error"
+    action: null,
   },
-  showSnackbar: (message, type = "info") =>
+  showSnackbar: (message, type = "info", action = null) =>
     set({
       snackbar: {
         visible: true,
         message,
         type,
+        action,
       },
     }),
   hideSnackbar: () =>
@@ -37,6 +42,7 @@ export const useAppStore = create((set) => ({
       snackbar: {
         ...state.snackbar,
         visible: false,
+        action: null,
       },
     })),
 }));

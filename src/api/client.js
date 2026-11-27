@@ -1,5 +1,7 @@
 import axios from "axios";
 import { useAuthStore } from "../store/useAuthStore";
+import { useAppStore } from "../store/useAppStore";
+import { queryClient } from "../lib/queryClient";
 
 /**
  * URL base do Back-end Express 5 + PostgreSQL (NeonDB/Vercel).
@@ -68,6 +70,26 @@ const renovarSessao = async () => {
   return refreshPromise;
 };
 
+// Garante limpeza única da sessão expirada (sem loop em 401 simultâneos)
+let limpandoSessaoExpirada = false;
+
+const encerrarSessaoExpirada = () => {
+  const { token, clearAuth } = useAuthStore.getState();
+  if (!token || limpandoSessaoExpirada) return;
+
+  limpandoSessaoExpirada = true;
+  try {
+    clearAuth();
+    useAppStore.getState().resetOperacional();
+    queryClient.clear();
+    useAppStore.getState().showSnackbar("Sessão expirada", "error");
+  } finally {
+    setTimeout(() => {
+      limpandoSessaoExpirada = false;
+    }, 500);
+  }
+};
+
 const isRotaDeAutenticacao = (config) => {
   const url = config?.url || "";
   const method = config?.method?.toLowerCase();
@@ -77,16 +99,19 @@ const isRotaDeAutenticacao = (config) => {
 const anexarMensagemAmigavel = (error) => {
   const status = error.response?.status;
   const apiMessage = error.response?.data?.message;
+  const semRede =
+    !error.response ||
+    error.message === "Network Error" ||
+    error.code === "ECONNABORTED";
 
-  // Anexa mensagem amigável padronizada pelo AppError do Express 5
   error.friendlyMessage =
     apiMessage ||
     (status === 429
-      ? "Muitas tentativas seguidas (Rate Limit). Aguarde alguns minutos."
+      ? "Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo."
       : status === 403
         ? "Você não tem permissão para realizar esta operação."
-        : error.message === "Network Error"
-          ? "Sem conexão com o servidor. Verifique o arquivo .env (EXPO_PUBLIC_API_URL) e sua internet."
+        : semRede
+          ? "Sem conexão. Verifique a internet e tente de novo."
           : "Ocorreu um erro inesperado na comunicação com o servidor.");
 
   return error;
@@ -107,7 +132,7 @@ apiClient.interceptors.response.use(
         original.headers.Authorization = `Bearer ${novoToken}`;
         return apiClient(original);
       } catch {
-        useAuthStore.getState().clearAuth();
+        encerrarSessaoExpirada();
       }
     }
 
