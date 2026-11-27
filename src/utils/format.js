@@ -40,6 +40,9 @@ export const parseValorMonetario = (valor) => {
   return Number(normalizado);
 };
 
+// Alias para compatibilidade com Financeiro e formulários
+export const moedaParaNumero = parseValorMonetario;
+
 // Formata data ISO (AAAA-MM-DD ou timestamp) em "dd/mm/aaaa"
 export const formatarDataBR = (dataIso) => {
   if (!dataIso) return "—";
@@ -92,7 +95,8 @@ export const mascaraTelefone = (valor) => {
   const d = apenasDigitos(valor).slice(0, 11);
   if (d.length <= 2) return d;
   if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
-  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  if (d.length <= 10)
+    return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 };
 

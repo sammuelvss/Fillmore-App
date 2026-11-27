@@ -132,6 +132,28 @@ export default function RootLayout() {
             >
               <Stack.Screen name="(auth)" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="perfil"
+                options={{
+                  headerShown: true,
+                  title: "Meu Perfil",
+                  presentation: "card",
+                  headerStyle: { backgroundColor: colors.secondary },
+                  headerTintColor: "#FFFFFF",
+                  headerTitleStyle: { fontWeight: "800" },
+                }}
+              />
+              <Stack.Screen
+                name="sobre"
+                options={{
+                  headerShown: true,
+                  title: "Sobre o Projeto & Equipe",
+                  presentation: "card",
+                  headerStyle: { backgroundColor: colors.secondary },
+                  headerTintColor: "#FFFFFF",
+                  headerTitleStyle: { fontWeight: "800" },
+                }}
+              />
             </Stack>
           </NavigationGuard>
 

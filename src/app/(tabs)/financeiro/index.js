@@ -4,6 +4,7 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  TouchableOpacity,
   View,
 } from "react-native";
 import {
@@ -49,6 +50,7 @@ import { getMensalidadesDoAluno } from "../../../api/mensalidadesApi";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { useAppStore } from "../../../store/useAppStore";
 import { useAlunosQuery } from "../../../hooks/useAlunos";
+import { useRotasQuery } from "../../../hooks/useRotas";
 import {
   MENSALIDADES_KEYS,
   useCreateMensalidadeMutation,
@@ -67,6 +69,21 @@ const FILTROS_STATUS = [
   { value: "PAGO", label: "Pagas" },
 ];
 
+const NOMES_MESES = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
 const montarVencimentoMesISO = (ano, mes, diaPreferido) => {
   const ultimoDiaMes = new Date(ano, mes, 0).getDate();
   const diaSeguro = Math.min(
@@ -78,12 +95,12 @@ const montarVencimentoMesISO = (ano, mes, diaPreferido) => {
 
 /**
  * Tela de Financeiro (Exclusiva para Motorista) — Fase 5
- * - Card de resumo financeiro no topo: Recebido, Pendente e Atrasado em R$
+ * - Navegador de mês/ano ("< Novembro/2026 >" + "Ver todos os meses") para consultar o valor cobrado de cada mês
+ * - Card de resumo financeiro no topo: Recebido, Pendente e Atrasado em R$ do período selecionado
  * - Filtros por status (Todas | Pendentes | Atrasadas | Pagas) e por aluno
- * - Status normalizado no cliente com `resolverStatusMensalidade` (PAGO verde, PENDENTE âmbar escuro, ATRASADO vermelho)
  * - "Registrar pagamento" com "Desfazer" no Snackbar (reverte para PENDENTE)
- * - "Cobrar" dispara notificação na API e abre/oferece envio por WhatsApp com chave Pix pré-preenchida
- * - "Gerar faturas do mês" em lote com revisão de alunos elegíveis, valor editável, barra de progresso e retentativa de falhas
+ * - "Cobrar" dispara notificação na API e abre envio por WhatsApp com chave Pix pré-preenchida
+ * - "Gerar faturas do mês" em lote apenas para alunos vinculados às rotas do motorista logado
  * - FAB "+" para lançar fatura avulsa
  */
 export default function FinanceiroScreen() {
@@ -97,16 +114,74 @@ export default function FinanceiroScreen() {
   const hojeIso = hojeLocal();
   const [anoAtualStr, mesAtualStr] = hojeIso.split("-");
 
+  // Período selecionado para pular entre o valor cobrado de cada mês
+  const [mesFiltro, setMesFiltro] = useState(Number(mesAtualStr));
+  const [anoFiltro, setAnoFiltro] = useState(Number(anoAtualStr));
+  const [verTodosMeses, setVerTodosMeses] = useState(false);
+
   const [filtroStatus, setFiltroStatus] = useState("TODAS");
   const [alunoFiltroId, setAlunoFiltroId] = useState("TODOS");
 
   const alunosQuery = useAlunosQuery();
-  const alunos = useMemo(
+  const {
+    data: rotasRaw,
+    isLoading: loadingRotas,
+    refetch: refetchRotas,
+  } = useRotasQuery();
+
+  const todosAlunos = useMemo(
     () => (Array.isArray(alunosQuery.data) ? alunosQuery.data : []),
     [alunosQuery.data],
   );
 
-  // Carrega mensalidades de todos os alunos do motorista em paralelo
+  // Filtra estritamente alunos vinculados às rotas do motorista logado
+  // (o back-end exige que o aluno esteja em uma rota do motorista para gerenciar mensalidades)
+  const motoristaId = user?.motorista?.id;
+  const alunos = useMemo(() => {
+    const listaRotas = Array.isArray(rotasRaw) ? rotasRaw : [];
+    const minhasRotas = motoristaId
+      ? listaRotas.filter(
+          (r) => !r.motoristaId || String(r.motoristaId) === String(motoristaId),
+        )
+      : listaRotas;
+
+    const minhasRotasIds = new Set(minhasRotas.map((r) => String(r.id)));
+    const alunosIdsDasMinhasRotas = new Set();
+
+    minhasRotas.forEach((rota) => {
+      const vinculados = [
+        ...(Array.isArray(rota.alunosIda) ? rota.alunosIda : []),
+        ...(Array.isArray(rota.alunosVolta) ? rota.alunosVolta : []),
+        ...(Array.isArray(rota.alunos) ? rota.alunos : []),
+      ];
+      vinculados.forEach((a) => {
+        if (a?.id) alunosIdsDasMinhasRotas.add(String(a.id));
+      });
+    });
+
+    return todosAlunos.filter((aluno) => {
+      if (alunosIdsDasMinhasRotas.has(String(aluno.id))) return true;
+      const rotaIdaId = aluno.rotaIdaId ?? aluno.rotaIda?.id;
+      const rotaVoltaId = aluno.rotaVoltaId ?? aluno.rotaVolta?.id;
+      if (rotaIdaId && minhasRotasIds.has(String(rotaIdaId))) return true;
+      if (rotaVoltaId && minhasRotasIds.has(String(rotaVoltaId))) return true;
+
+      if (motoristaId) {
+        const motIda =
+          aluno.rotaIda?.motoristaId ?? aluno.rotaIda?.motorista?.id;
+        const motVolta =
+          aluno.rotaVolta?.motoristaId ?? aluno.rotaVolta?.motorista?.id;
+        if (motIda && String(motIda) === String(motoristaId)) return true;
+        if (motVolta && String(motVolta) === String(motoristaId)) return true;
+      }
+
+      return false;
+    });
+  }, [todosAlunos, rotasRaw, motoristaId]);
+
+  const alunosSemRotaCount = Math.max(0, todosAlunos.length - alunos.length);
+
+  // Carrega mensalidades de todos os alunos vinculados às rotas do motorista
   const mensalidadesQueries = useQueries({
     queries: alunos.map((aluno) => ({
       queryKey: MENSALIDADES_KEYS.porAluno(aluno.id),
@@ -128,6 +203,7 @@ export default function FinanceiroScreen() {
 
   const isLoadingFaturas =
     alunosQuery.isLoading ||
+    loadingRotas ||
     mensalidadesQueries.some((q) => q.isLoading && !q.data);
   const isRefetchingFaturas =
     alunosQuery.isRefetching ||
@@ -160,7 +236,48 @@ export default function FinanceiroScreen() {
     );
   }, [mensalidadesQueries, alunos, hojeIso]);
 
-  // Resumo financeiro (Recebido, Pendente, Atrasado)
+  // Navegação rápida entre meses ("< Mês Anterior" | "Próximo Mês >")
+  const handleMudarMes = (delta) => {
+    setVerTodosMeses(false);
+    let novoMes = mesFiltro + delta;
+    let novoAno = anoFiltro;
+    if (novoMes < 1) {
+      novoMes = 12;
+      novoAno -= 1;
+    } else if (novoMes > 12) {
+      novoMes = 1;
+      novoAno += 1;
+    }
+    setMesFiltro(novoMes);
+    setAnoFiltro(novoAno);
+  };
+
+  // Lista de meses que possuem faturas cadastradas para pulo rápido em 1 toque
+  const mesesDisponiveis = useMemo(() => {
+    const mapa = new Map();
+    const chaveAtual = `${anoAtualStr}-${mesAtualStr}`;
+    mapa.set(chaveAtual, {
+      ano: Number(anoAtualStr),
+      mes: Number(mesAtualStr),
+      total: 0,
+    });
+
+    todasMensalidades.forEach((m) => {
+      const anoM = Number(m.anoReferencia);
+      const mesM = Number(m.mesReferencia);
+      if (!anoM || !mesM) return;
+      const chave = `${anoM}-${String(mesM).padStart(2, "0")}`;
+      const atual = mapa.get(chave) || { ano: anoM, mes: mesM, total: 0 };
+      atual.total += Number(m.valor || 0);
+      mapa.set(chave, atual);
+    });
+
+    return Array.from(mapa.values()).sort((a, b) =>
+      b.ano !== a.ano ? b.ano - a.ano : b.mes - a.mes,
+    );
+  }, [todasMensalidades, anoAtualStr, mesAtualStr]);
+
+  // Resumo financeiro (Recebido, Pendente, Atrasado e Total Cobrado) do mês selecionado (ou todos)
   const resumoFinanceiro = useMemo(() => {
     let recebido = 0;
     let pendente = 0;
@@ -174,6 +291,14 @@ export default function FinanceiroScreen() {
       ) {
         return;
       }
+      if (!verTodosMeses) {
+        if (
+          Number(m.mesReferencia) !== mesFiltro ||
+          Number(m.anoReferencia) !== anoFiltro
+        ) {
+          return;
+        }
+      }
       const val = Number(m.valor || 0);
       if (m.statusResolvido === "PAGO") {
         recebido += val;
@@ -185,8 +310,15 @@ export default function FinanceiroScreen() {
       }
     });
 
-    return { recebido, pendente, atrasado, qtdAtrasadas };
-  }, [todasMensalidades, alunoFiltroId]);
+    const totalCobrado = recebido + pendente + atrasado;
+    return { recebido, pendente, atrasado, totalCobrado, qtdAtrasadas };
+  }, [
+    todasMensalidades,
+    alunoFiltroId,
+    verTodosMeses,
+    mesFiltro,
+    anoFiltro,
+  ]);
 
   const faturasFiltradas = useMemo(() => {
     return todasMensalidades.filter((m) => {
@@ -196,12 +328,27 @@ export default function FinanceiroScreen() {
       ) {
         return false;
       }
+      if (!verTodosMeses) {
+        if (
+          Number(m.mesReferencia) !== mesFiltro ||
+          Number(m.anoReferencia) !== anoFiltro
+        ) {
+          return false;
+        }
+      }
       if (filtroStatus !== "TODAS" && m.statusResolvido !== filtroStatus) {
         return false;
       }
       return true;
     });
-  }, [todasMensalidades, alunoFiltroId, filtroStatus]);
+  }, [
+    todasMensalidades,
+    alunoFiltroId,
+    verTodosMeses,
+    mesFiltro,
+    anoFiltro,
+    filtroStatus,
+  ]);
 
   const criarMutation = useCreateMensalidadeMutation();
   const atualizarMutation = useUpdateMensalidadeMutation();
@@ -225,8 +372,8 @@ export default function FinanceiroScreen() {
 
   // Modal de Geração de Faturas do Mês em Lote
   const [loteVisivel, setLoteVisivel] = useState(false);
-  const [loteMes, setLoteMes] = useState(mesAtualStr);
-  const [loteAno, setLoteAno] = useState(anoAtualStr);
+  const [loteMes, setLoteMes] = useState(String(mesFiltro).padStart(2, "0"));
+  const [loteAno, setLoteAno] = useState(String(anoFiltro));
   const [loteValorPadrao, setLoteValorPadrao] = useState("250,00");
   const [valoresPorAluno, setValoresPorAluno] = useState({});
   const [loteExecutando, setLoteExecutando] = useState(false);
@@ -237,6 +384,7 @@ export default function FinanceiroScreen() {
 
   const handleRefreshAll = () => {
     alunosQuery.refetch();
+    refetchRotas();
     mensalidadesQueries.forEach((q) => q.refetch());
   };
 
@@ -290,7 +438,8 @@ export default function FinanceiroScreen() {
   const handleCobrar = async (fatura) => {
     setCobrandoId(fatura.id);
     const alunoObj =
-      fatura.aluno || alunos.find((a) => String(a.id) === String(fatura.alunoId));
+      fatura.aluno ||
+      alunos.find((a) => String(a.id) === String(fatura.alunoId));
     const responsavelNome =
       alunoObj?.responsavel?.usuario?.nome ||
       alunoObj?.nomeContatoEntrega ||
@@ -313,17 +462,20 @@ export default function FinanceiroScreen() {
     const msg = mensagemCobrancaPix({
       responsavelNome,
       alunoNome: alunoObj?.nome || "seu(sua) filho(a)",
-      valor: formatarMoeda(fatura.valor),
-      dataVencimentoBR: formatarDataBR(fatura.dataVencimento),
+      mesReferencia: fatura.mesReferencia,
+      anoReferencia: fatura.anoReferencia,
+      valor: fatura.valor,
+      dataVencimento: fatura.dataVencimento,
       chavePix: chavePixMotorista,
+      titularPix: user?.motorista?.titularPix || user?.nome,
     });
 
     const abriu = await abrirWhatsApp(telefone, msg, (erroMsg) =>
-      showSnackbar(`Cobrança registrada. ${erroMsg}`, "info"),
+      showSnackbar(`Notificação registrada. ${erroMsg}`, "info"),
     );
 
     if (abriu) {
-      showSnackbar("Cobrança registrada e aberta no WhatsApp!", "success");
+      showSnackbar("Notificação registrada e aberta no WhatsApp!", "success");
     }
   };
 
@@ -348,15 +500,13 @@ export default function FinanceiroScreen() {
         alunoAtivo ||
         alunos[0];
       const diaPadrao = alunoPadrao?.diaVencimentoMensalidade || 10;
-      const isoPadrao = montarVencimentoMesISO(
-        Number(anoAtualStr),
-        Number(mesAtualStr),
-        diaPadrao,
-      );
+      const mesAlvo = verTodosMeses ? Number(mesAtualStr) : mesFiltro;
+      const anoAlvo = verTodosMeses ? Number(anoAtualStr) : anoFiltro;
+      const isoPadrao = montarVencimentoMesISO(anoAlvo, mesAlvo, diaPadrao);
       setFaturaEditando(null);
       setAlunoAvulsoId(alunoPadrao?.id ? String(alunoPadrao.id) : "");
-      setMesRefAvulso(mesAtualStr);
-      setAnoRefAvulso(anoAtualStr);
+      setMesRefAvulso(String(mesAlvo).padStart(2, "0"));
+      setAnoRefAvulso(String(anoAlvo));
       setValorAvulso("250,00");
       setVencimentoAvulsoBR(formatarDataBR(isoPadrao));
     }
@@ -416,6 +566,9 @@ export default function FinanceiroScreen() {
             dataVencimento: dataIso,
           },
         });
+        setMesFiltro(mesNum);
+        setAnoFiltro(anoNum);
+        setVerTodosMeses(false);
         showSnackbar("Fatura criada com sucesso!", "success");
       }
       setModalAvulsaVisivel(false);
@@ -426,7 +579,7 @@ export default function FinanceiroScreen() {
     }
   };
 
-  // Elegíveis para geração em lote (alunos que ainda NÃO têm fatura naquele mês/ano)
+  // Elegíveis para geração em lote (alunos vinculados às rotas do motorista que ainda NÃO têm fatura naquele mês/ano)
   const alunosElegiveisLote = useMemo(() => {
     const mesNum = Number.parseInt(loteMes, 10);
     const anoNum = Number.parseInt(loteAno, 10);
@@ -444,8 +597,10 @@ export default function FinanceiroScreen() {
   }, [alunos, todasMensalidades, loteMes, loteAno]);
 
   const abrirModalLote = () => {
-    setLoteMes(mesAtualStr);
-    setLoteAno(anoAtualStr);
+    const mesAlvo = verTodosMeses ? Number(mesAtualStr) : mesFiltro;
+    const anoAlvo = verTodosMeses ? Number(anoAtualStr) : anoFiltro;
+    setLoteMes(String(mesAlvo).padStart(2, "0"));
+    setLoteAno(String(anoAlvo));
     setLoteValorPadrao("250,00");
     setValoresPorAluno({});
     setLoteResultado(null);
@@ -469,7 +624,7 @@ export default function FinanceiroScreen() {
 
     if (listaAlunosParaGerar.length === 0) {
       showSnackbar(
-        "Todos os alunos já possuem fatura para este mês/ano.",
+        "Todos os alunos vinculados às suas rotas já possuem fatura neste mês.",
         "info",
       );
       return;
@@ -505,9 +660,13 @@ export default function FinanceiroScreen() {
         });
         criadas += 1;
       } catch (err) {
+        const statusHttp = err?.response?.status;
         falhas.push({
           aluno,
-          erro: err?.friendlyMessage || "Falha ao criar fatura",
+          erro:
+            statusHttp === 403
+              ? "Aluno sem rota vinculada a este motorista (vincule-o em Alunos)"
+              : err?.friendlyMessage || "Falha ao criar fatura",
         });
       }
 
@@ -520,6 +679,9 @@ export default function FinanceiroScreen() {
     await queryClient.invalidateQueries({ queryKey: MENSALIDADES_KEYS.all });
     setLoteExecutando(false);
     setLoteResultado({ criadas, falhas });
+    setMesFiltro(mesNum);
+    setAnoFiltro(anoNum);
+    setVerTodosMeses(false);
 
     if (falhas.length === 0) {
       showSnackbar(
@@ -559,6 +721,9 @@ export default function FinanceiroScreen() {
     );
   }
 
+  const nomeMesSelecionado =
+    NOMES_MESES[mesFiltro - 1] || `Mês ${String(mesFiltro).padStart(2, "0")}`;
+
   return (
     <View style={styles.container}>
       <FlatList
@@ -574,7 +739,7 @@ export default function FinanceiroScreen() {
         }
         ListHeaderComponent={
           <View style={styles.headerBlock}>
-            {/* Card de Resumo do Mês */}
+            {/* Card de Resumo Financeiro + Seletor de Mês */}
             <Surface style={styles.summaryCard} elevation={2}>
               <View style={styles.summaryTopRow}>
                 <View style={{ flex: 1 }}>
@@ -582,7 +747,15 @@ export default function FinanceiroScreen() {
                     RESUMO FINANCEIRO
                   </Text>
                   <Text variant="titleMedium" style={styles.summaryTitle}>
-                    Controle de Mensalidades & Pix
+                    {verTodosMeses
+                      ? "Todos os meses"
+                      : `${nomeMesSelecionado} de ${anoFiltro}`}
+                  </Text>
+                  <Text variant="bodySmall" style={styles.totalCobradoText}>
+                    Total cobrado:{" "}
+                    <Text style={{ fontWeight: "800", color: "#FFFFFF" }}>
+                      {formatarMoeda(resumoFinanceiro.totalCobrado)}
+                    </Text>
                   </Text>
                 </View>
 
@@ -596,6 +769,103 @@ export default function FinanceiroScreen() {
                 >
                   {chavePixMotorista ? "Copiar Pix" : "Sem Pix"}
                 </Button>
+              </View>
+
+              {/* Navegador para pular entre os meses ("< Mês | Próximo >") */}
+              <View style={styles.monthNavBox}>
+                <View style={styles.monthStepperRow}>
+                  <TouchableOpacity
+                    style={styles.monthArrowBtn}
+                    onPress={() => handleMudarMes(-1)}
+                    accessibilityLabel="Mês anterior"
+                  >
+                    <MaterialCommunityIcons
+                      name="chevron-left"
+                      size={22}
+                      color="#FFFFFF"
+                    />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.monthCenterPill}
+                    onPress={() => setVerTodosMeses((v) => !v)}
+                  >
+                    <MaterialCommunityIcons
+                      name="calendar-month"
+                      size={16}
+                      color={colors.primary}
+                    />
+                    <Text variant="labelLarge" style={styles.monthCenterText}>
+                      {verTodosMeses
+                        ? "Exibindo todos os meses"
+                        : `${String(mesFiltro).padStart(2, "0")}/${anoFiltro} • ${nomeMesSelecionado}`}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.monthArrowBtn}
+                    onPress={() => handleMudarMes(1)}
+                    accessibilityLabel="Próximo mês"
+                  >
+                    <MaterialCommunityIcons
+                      name="chevron-right"
+                      size={22}
+                      color="#FFFFFF"
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Atalhos dos meses com valor cobrado */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.monthShortcutsRow}
+                >
+                  <Chip
+                    compact
+                    selected={verTodosMeses}
+                    onPress={() => setVerTodosMeses(true)}
+                    style={[
+                      styles.monthChip,
+                      verTodosMeses && styles.monthChipSelected,
+                    ]}
+                    textStyle={[
+                      styles.monthChipText,
+                      verTodosMeses && styles.monthChipTextSelected,
+                    ]}
+                  >
+                    Todos
+                  </Chip>
+                  {mesesDisponiveis.map((itemMes) => {
+                    const ativo =
+                      !verTodosMeses &&
+                      itemMes.mes === mesFiltro &&
+                      itemMes.ano === anoFiltro;
+                    const labelCurto = `${NOMES_MESES[itemMes.mes - 1]?.slice(0, 3)}/${String(itemMes.ano).slice(-2)}`;
+                    return (
+                      <Chip
+                        key={`${itemMes.ano}-${itemMes.mes}`}
+                        compact
+                        selected={ativo}
+                        onPress={() => {
+                          setVerTodosMeses(false);
+                          setMesFiltro(itemMes.mes);
+                          setAnoFiltro(itemMes.ano);
+                        }}
+                        style={[
+                          styles.monthChip,
+                          ativo && styles.monthChipSelected,
+                        ]}
+                        textStyle={[
+                          styles.monthChipText,
+                          ativo && styles.monthChipTextSelected,
+                        ]}
+                      >
+                        {labelCurto} ({formatarMoeda(itemMes.total)})
+                      </Chip>
+                    );
+                  })}
+                </ScrollView>
               </View>
 
               <View style={styles.kpiRow}>
@@ -650,7 +920,7 @@ export default function FinanceiroScreen() {
               </Button>
             </Surface>
 
-            {/* Filtros por Status */}
+            {/* Filtros por Status e por Aluno */}
             <Surface style={styles.filtersCard} elevation={1}>
               <ScrollView
                 horizontal
@@ -680,7 +950,6 @@ export default function FinanceiroScreen() {
                 })}
               </ScrollView>
 
-              {/* Filtro por Aluno */}
               {alunos.length > 0 ? (
                 <ScrollView
                   horizontal
@@ -697,7 +966,7 @@ export default function FinanceiroScreen() {
                       alunoFiltroId === "TODOS" && styles.alunoChipSelected,
                     ]}
                   >
-                    Todos os alunos ({alunos.length})
+                    Todos da van ({alunos.length})
                   </Chip>
                   {alunos.map((aluno) => {
                     const selected =
@@ -795,13 +1064,14 @@ export default function FinanceiroScreen() {
               </View>
 
               {!isPago ? (
-                <View style={styles.cardActionsRow}>
+                <View style={styles.cardActionsCol}>
                   <Button
                     mode="outlined"
                     icon="check-circle-outline"
                     textColor="#166534"
                     style={styles.payBtn}
                     contentStyle={styles.actionBtnContent}
+                    labelStyle={styles.payBtnLabel}
                     loading={pagandoId === item.id}
                     disabled={pagandoId === item.id || cobrandoId === item.id}
                     onPress={() => handleRegistrarPagamento(item)}
@@ -816,12 +1086,12 @@ export default function FinanceiroScreen() {
                     textColor={colors.text}
                     style={styles.chargeBtn}
                     contentStyle={styles.actionBtnContent}
-                    labelStyle={{ fontWeight: "800" }}
+                    labelStyle={styles.chargeBtnLabel}
                     loading={cobrandoId === item.id}
                     disabled={pagandoId === item.id || cobrandoId === item.id}
                     onPress={() => handleCobrar(item)}
                   >
-                    Cobrar
+                    Notificar
                   </Button>
                 </View>
               ) : null}
@@ -839,9 +1109,13 @@ export default function FinanceiroScreen() {
           ) : (
             <EmptyState
               icon="receipt-text-outline"
-              title="Nenhuma mensalidade encontrada"
-              description="Use o botão 'Gerar faturas do mês' para lançar as mensalidades de todos os alunos de uma só vez ou toque em '+' para criar uma fatura avulsa."
-              actionLabel="Gerar faturas do mês"
+              title={
+                verTodosMeses
+                  ? "Nenhuma mensalidade encontrada"
+                  : `Sem faturas em ${nomeMesSelecionado}/${anoFiltro}`
+              }
+              description="Use o botão 'Gerar faturas do mês' para lançar as mensalidades de todos os alunos da sua van ou navegue para outro mês no topo."
+              actionLabel="Gerar faturas deste mês"
               onAction={abrirModalLote}
             />
           )
@@ -870,9 +1144,23 @@ export default function FinanceiroScreen() {
           </Dialog.Title>
           <Dialog.Content>
             <Text variant="bodySmall" style={styles.dialogSubtitle}>
-              Cria faturas para os alunos que ainda não possuem lançamento no
-              mês/ano escolhido, usando o dia de vencimento de cada aluno.
+              Cria faturas para os alunos vinculados às suas rotas que ainda não
+              possuem lançamento no mês/ano escolhido.
             </Text>
+
+            {alunosSemRotaCount > 0 ? (
+              <Surface style={styles.semRotaInfoBox} elevation={0}>
+                <MaterialCommunityIcons
+                  name="information-outline"
+                  size={16}
+                  color="#9A3412"
+                />
+                <Text variant="labelSmall" style={styles.semRotaInfoText}>
+                  {alunosSemRotaCount} aluno(s) sem rota vinculada não entram no
+                  lote até serem vinculados na aba Alunos.
+                </Text>
+              </Surface>
+            ) : null}
 
             <View style={styles.row}>
               <TextInput
@@ -925,8 +1213,8 @@ export default function FinanceiroScreen() {
                   color="#166534"
                 />
                 <Text variant="bodySmall" style={styles.allGeneratedText}>
-                  Todos os alunos cadastrados já possuem fatura para {loteMes}/
-                  {loteAno}.
+                  Todos os alunos das suas rotas já possuem fatura para{" "}
+                  {loteMes}/{loteAno}.
                 </Text>
               </Surface>
             ) : (
@@ -993,8 +1281,17 @@ export default function FinanceiroScreen() {
               <Surface style={styles.batchErrorBox} elevation={0}>
                 <Text variant="labelMedium" style={styles.batchErrorTitle}>
                   {loteResultado.criadas} criada(s),{" "}
-                  {loteResultado.falhas.length} com erro
+                  {loteResultado.falhas.length} com erro:
                 </Text>
+                {loteResultado.falhas.map((f) => (
+                  <Text
+                    key={f.aluno.id}
+                    variant="labelSmall"
+                    style={styles.batchErrorDetail}
+                  >
+                    • {f.aluno.nome}: {f.erro}
+                  </Text>
+                ))}
                 <Button
                   mode="contained-tonal"
                   compact
@@ -1226,7 +1523,7 @@ const styles = StyleSheet.create({
   summaryTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
   },
   summaryEyebrow: {
@@ -1239,9 +1536,66 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginTop: 2,
   },
+  totalCobradoText: {
+    color: "#CBD5E1",
+    marginTop: 2,
+  },
   copyPixBtn: {
     borderColor: "#475569",
     borderRadius: 10,
+  },
+  monthNavBox: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 14,
+    padding: 10,
+    gap: 10,
+  },
+  monthStepperRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  monthArrowBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  monthCenterPill: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 10,
+  },
+  monthCenterText: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+  },
+  monthShortcutsRow: {
+    gap: 8,
+  },
+  monthChip: {
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  monthChipSelected: {
+    backgroundColor: colors.primary,
+  },
+  monthChipText: {
+    color: "#E2E8F0",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  monthChipTextSelected: {
+    color: colors.text,
+    fontWeight: "800",
   },
   kpiRow: {
     flexDirection: "row",
@@ -1354,19 +1708,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: -8,
   },
-  cardActionsRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 2,
+  cardActionsCol: {
+    gap: 8,
+    marginTop: 4,
   },
   payBtn: {
-    flex: 1,
-    borderRadius: 10,
+    width: "100%",
+    borderRadius: 12,
     borderColor: "#86EFAC",
   },
+  payBtnLabel: {
+    fontWeight: "800",
+    fontSize: 14,
+  },
   chargeBtn: {
-    flex: 1,
-    borderRadius: 10,
+    width: "100%",
+    borderRadius: 12,
+  },
+  chargeBtnLabel: {
+    fontWeight: "800",
+    fontSize: 14,
   },
   actionBtnContent: {
     minHeight: 48,
@@ -1399,6 +1760,20 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: 10,
     lineHeight: 18,
+  },
+  semRotaInfoBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FFEDD5",
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  semRotaInfoText: {
+    flex: 1,
+    color: "#9A3412",
+    fontWeight: "600",
   },
   row: {
     flexDirection: "row",
@@ -1459,11 +1834,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF1F2",
     padding: 10,
     borderRadius: 10,
-    gap: 8,
+    gap: 6,
     marginTop: 8,
   },
   batchErrorTitle: {
     color: "#991B1B",
     fontWeight: "800",
+  },
+  batchErrorDetail: {
+    color: "#991B1B",
   },
 });

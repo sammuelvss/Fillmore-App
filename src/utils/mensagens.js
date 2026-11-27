@@ -19,19 +19,25 @@ export const mensagemCobrancaPix = ({
   anoReferencia,
   valor,
   dataVencimento,
+  dataVencimentoBR,
   chavePix,
   titularPix,
 } = {}) => {
   const aluno = primeiroNome(alunoNome);
-  const mes = String(mesReferencia || "").padStart(2, "0");
-  const ref = mes && anoReferencia ? `${mes}/${anoReferencia}` : "atual";
-  const valorFmt = formatarMoeda(valor);
-  const vencFmt = dataVencimento ? formatarDataBR(dataVencimento) : "—";
+  const mes = mesReferencia ? String(mesReferencia).padStart(2, "0") : "";
+  const ref = mes && anoReferencia ? ` referente a ${mes}/${anoReferencia}` : "";
+  const valorFmt =
+    typeof valor === "string" && valor.includes("R$")
+      ? valor
+      : formatarMoeda(valor);
+  const vencFmt =
+    dataVencimentoBR ||
+    (dataVencimento ? formatarDataBR(dataVencimento) : "—");
   const pixTexto = chavePix
     ? `\n\nChave Pix: ${chavePix}${titularPix ? ` (${titularPix})` : ""}`
     : "";
 
-  return `Olá! Passando para lembrar da mensalidade do transporte escolar de ${aluno} referente a ${ref}, no valor de ${valorFmt} (vencimento em ${vencFmt}).${pixTexto}\n\nQualquer dúvida, estou à disposição!`;
+  return `Olá! Passando para lembrar da mensalidade do transporte escolar de ${aluno}${ref}, no valor de ${valorFmt} (vencimento em ${vencFmt}).${pixTexto}\n\nQualquer dúvida, estou à disposição!`;
 };
 
 export const mensagemContatoResponsavel = ({ alunoNome, motoristaNome } = {}) => {

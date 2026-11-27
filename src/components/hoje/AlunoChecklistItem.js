@@ -310,9 +310,9 @@ export default function AlunoChecklistItem({
         </Text>
       ) : null}
 
-      {/* Até 3 ações visíveis com alvos >= 48dp */}
+      {/* Até 3 ações visíveis com alvos >= 48dp e sem esmagar o texto */}
       {ausenteHoje ? (
-        <View style={styles.actionsRow}>
+        <View style={styles.actionsContainer}>
           <Button
             mode="outlined"
             icon="backup-restore"
@@ -321,51 +321,61 @@ export default function AlunoChecklistItem({
             onPress={handleReativarViagem}
             textColor={colors.secondary}
             contentStyle={styles.btnContent48}
-            style={styles.flexBtn}
+            style={styles.fullWidthBtn}
           >
             Reativar aluno hoje
           </Button>
         </View>
       ) : (
-        <View style={styles.actionsRow}>
+        <View style={styles.actionsContainer}>
           <Button
-            mode={embarcouEfetivo ? "contained" : "contained-tonal"}
-            icon={embarcouEfetivo ? "check-circle" : "checkbox-blank-circle-outline"}
+            mode="contained"
+            icon={
+              embarcouEfetivo
+                ? "check-circle"
+                : "checkbox-blank-circle-outline"
+            }
             loading={mutandoPresenca}
             disabled={mutandoPresenca}
             onPress={handleToggleEmbarque}
             buttonColor={embarcouEfetivo ? colors.success : colors.primary}
             textColor={embarcouEfetivo ? "#FFFFFF" : colors.text}
             contentStyle={styles.btnContent48}
+            labelStyle={styles.embarcouBtnLabel}
             style={styles.embarcouBtn}
           >
-            {embarcouEfetivo ? "Embarcou" : "Marcar embarque"}
+            {embarcouEfetivo ? "Embarcado (desmarcar)" : "Embarcou"}
           </Button>
 
-          <Button
-            mode="outlined"
-            icon="whatsapp"
-            loading={criarNotificacao.isPending}
-            disabled={criarNotificacao.isPending}
-            onPress={handleAvisarVanChegando}
-            textColor="#166534"
-            contentStyle={styles.btnContent48}
-            style={styles.whatsBtn}
-            accessibilityLabel={`Avisar no WhatsApp que a van está chegando para ${aluno.nome}`}
-          >
-            Van chegando
-          </Button>
+          <View style={styles.secondaryActionsRow}>
+            <Button
+              mode="outlined"
+              icon="whatsapp"
+              loading={criarNotificacao.isPending}
+              disabled={criarNotificacao.isPending}
+              onPress={handleAvisarVanChegando}
+              textColor="#166534"
+              contentStyle={styles.btnContent48}
+              labelStyle={styles.secondaryBtnLabel}
+              style={styles.whatsBtn}
+              accessibilityLabel={`Avisar no WhatsApp que a van está chegando para ${aluno.nome}`}
+            >
+              Van chegando
+            </Button>
 
-          <Button
-            mode="text"
-            compact
-            disabled={cancelarViagem.isPending}
-            onPress={() => setDialogAusencia(true)}
-            textColor={colors.textSecondary}
-            contentStyle={styles.btnContent48}
-          >
-            Não vai hoje
-          </Button>
+            <Button
+              mode="outlined"
+              icon="calendar-remove-outline"
+              disabled={cancelarViagem.isPending}
+              onPress={() => setDialogAusencia(true)}
+              textColor={colors.textSecondary}
+              contentStyle={styles.btnContent48}
+              labelStyle={styles.secondaryBtnLabel}
+              style={styles.ausenteBtn}
+            >
+              Não vai hoje
+            </Button>
+          </View>
         </View>
       )}
 
@@ -475,22 +485,38 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontStyle: "italic",
   },
-  actionsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
+  actionsContainer: {
     gap: 8,
+    marginTop: 2,
   },
   embarcouBtn: {
-    flex: 1,
+    width: "100%",
     borderRadius: 12,
   },
+  embarcouBtnLabel: {
+    fontWeight: "800",
+    fontSize: 15,
+  },
+  secondaryActionsRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
   whatsBtn: {
+    flex: 1,
     borderRadius: 12,
     borderColor: "#166534",
   },
-  flexBtn: {
+  ausenteBtn: {
     flex: 1,
+    borderRadius: 12,
+    borderColor: colors.border,
+  },
+  secondaryBtnLabel: {
+    fontWeight: "700",
+    fontSize: 13,
+  },
+  fullWidthBtn: {
+    width: "100%",
     borderRadius: 12,
   },
   btnContent48: {

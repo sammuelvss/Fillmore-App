@@ -10,7 +10,7 @@ import {
   Avatar,
 } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { colors } from "../../theme";
+import { colors } from "../theme";
 
 // Preencha ou atualize facilmente os RAs dos integrantes da equipe aqui:
 export const RAS_EQUIPE = {

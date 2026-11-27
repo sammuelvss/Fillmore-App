@@ -1,48 +1,13 @@
 import React from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
-import { Tabs, useRouter } from "expo-router";
-import { Avatar } from "react-native-paper";
+import { Tabs } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { colors } from "../../theme";
-import { useAuthStore } from "../../store/useAuthStore";
+import HeaderPerfilButton from "../../components/HeaderPerfilButton";
 
-// Navegação principal motorista-only: 4 abas (Hoje, Rotas, Alunos, Financeiro) + Avatar para Perfil
+// Navegação principal motorista-only: exatamente 4 abas (Hoje, Rotas, Alunos, Financeiro)
+// Perfil (/perfil) e Sobre (/sobre) ficam na Stack raiz (src/app/_layout.js) para evitar colisão de rotas no Expo Router.
 export default function TabsLayout() {
-  const router = useRouter();
-  const user = useAuthStore((state) => state.user);
-  const iniciais = (user?.nome || "M")
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p[0])
-    .join("")
-    .toUpperCase();
-
-  const renderPerfilAvatarButton = () => (
-    <TouchableOpacity
-      onPress={() => router.push("/(tabs)/perfil")}
-      style={styles.headerTouch}
-      accessibilityLabel="Abrir Meu Perfil"
-    >
-      <Avatar.Text
-        size={34}
-        label={iniciais || "M"}
-        style={{ backgroundColor: colors.primary }}
-        color={colors.text}
-        labelStyle={{ fontWeight: "800", fontSize: 13 }}
-      />
-    </TouchableOpacity>
-  );
-
-  const renderVoltarHojeButton = () => (
-    <TouchableOpacity
-      onPress={() => router.replace("/(tabs)/hoje")}
-      style={styles.headerBackTouch}
-      accessibilityLabel="Voltar para Hoje"
-    >
-      <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
-    </TouchableOpacity>
-  );
+  const renderPerfilAvatarButton = () => <HeaderPerfilButton />;
 
   return (
     <Tabs
@@ -129,44 +94,6 @@ export default function TabsLayout() {
           ),
         }}
       />
-
-      <Tabs.Screen
-        name="perfil/index"
-        options={{
-          href: null,
-          title: "Perfil",
-          headerTitle: "Meu Perfil",
-          headerLeft: renderVoltarHojeButton,
-          headerRight: () => null,
-        }}
-      />
-
-      <Tabs.Screen
-        name="sobre"
-        options={{
-          href: null,
-          title: "Sobre",
-          headerTitle: "Sobre o Projeto & Equipe",
-          headerLeft: renderVoltarHojeButton,
-        }}
-      />
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  headerTouch: {
-    width: 48,
-    height: 48,
-    marginRight: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerBackTouch: {
-    width: 48,
-    height: 48,
-    marginLeft: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});

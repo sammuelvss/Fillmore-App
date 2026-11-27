@@ -19,28 +19,28 @@ import {
   HelperText,
 } from "react-native-paper";
 import { useRouter } from "expo-router";
-import { colors } from "../../../theme";
-import { mascaraPlaca, mascaraTelefone } from "../../../utils/format";
+import { colors } from "../theme";
+import { mascaraPlaca, mascaraTelefone } from "../utils/format";
 import {
   validarCapacidadeVan,
   validarCNH,
   validarPlaca,
   validarSenha,
   validarTelefone,
-} from "../../../utils/validators";
-import { useAuthStore } from "../../../store/useAuthStore";
+} from "../utils/validators";
+import { useAuthStore } from "../store/useAuthStore";
 import {
   useUserProfileQuery,
   useUpdateProfileMutation,
   useLogoutMutation,
   useDeleteAccountMutation,
-} from "../../../hooks/useAuth";
+} from "../hooks/useAuth";
 
 /**
  * Tela de Perfil do Motorista — Fase 5
  * - Seções claras: Dados pessoais e Dados da van e Pix
  * - Máscaras e validadores de telefone, placa, CNH e capacidade da van
- * - Item "Sobre o Projeto" (`/(tabs)/sobre`)
+ * - Item "Sobre o Projeto" (`/sobre`)
  * - "Sair da conta" (revoga token e limpa caches)
  * - "Excluir minha conta" com confirmação citando o nome do motorista
  */
@@ -328,7 +328,7 @@ export default function PerfilScreen() {
           <Button
             mode="outlined"
             icon="information-outline"
-            onPress={() => router.push("/(tabs)/sobre")}
+            onPress={() => router.push("/sobre")}
             style={styles.secondaryBtn}
             contentStyle={styles.secondaryBtnContent}
             textColor={colors.secondary}

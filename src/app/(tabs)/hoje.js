@@ -173,15 +173,33 @@ export default function HojeScreen() {
       {/* Card de Onboarding em 3 passos (some quando rotas, alunos e vínculos existem) */}
       <OnboardingCard rotas={rotas} alunos={todosAlunos} />
 
-      {/* 1. Seletor de Turno (Manhã | Tarde) */}
+      {/* 1. Seletor de Turno (Manhã | Tarde) + Atalho visível para Meu Perfil / Sair */}
       <Surface style={styles.shiftBox} elevation={1}>
         <View style={styles.shiftTopRow}>
-          <Text variant="titleSmall" style={styles.shiftLabel}>
-            Hoje • {formatarDataBR(dataHoje)}
-          </Text>
-          <Text variant="labelMedium" style={styles.shiftSub}>
-            Turno ativo
-          </Text>
+          <View style={{ flex: 1 }}>
+            <Text variant="titleSmall" style={styles.shiftLabel}>
+              Hoje • {formatarDataBR(dataHoje)}
+            </Text>
+            <Text variant="labelSmall" style={styles.shiftSub}>
+              Olá, {user?.nome?.split(" ")[0] || "Motorista"}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.perfilQuickChip}
+            activeOpacity={0.75}
+            onPress={() => router.push("/perfil")}
+            accessibilityRole="button"
+            accessibilityLabel="Abrir Meu Perfil e Sair da conta"
+          >
+            <MaterialCommunityIcons
+              name="account-circle-outline"
+              size={18}
+              color={colors.secondary}
+            />
+            <Text variant="labelMedium" style={styles.perfilQuickText}>
+              Meu Perfil
+            </Text>
+          </TouchableOpacity>
         </View>
         <SegmentedButtons
           value={turnoAtivo}
@@ -440,6 +458,22 @@ const styles = StyleSheet.create({
   },
   shiftSub: {
     color: colors.textSecondary,
+    marginTop: 2,
+  },
+  perfilQuickChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.primaryDark,
+  },
+  perfilQuickText: {
+    color: colors.secondary,
+    fontWeight: "800",
   },
   rotasChipsRow: {
     gap: 8,

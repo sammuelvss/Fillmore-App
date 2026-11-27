@@ -171,9 +171,12 @@ export default function AlunoDetalheScreen() {
     const msg = mensagemCobrancaPix({
       responsavelNome,
       alunoNome: aluno.nome,
-      valor: formatarMoeda(fatura.valor),
-      dataVencimentoBR: formatarDataBR(fatura.dataVencimento),
+      mesReferencia: fatura.mesReferencia,
+      anoReferencia: fatura.anoReferencia,
+      valor: fatura.valor,
+      dataVencimento: fatura.dataVencimento,
       chavePix: user?.motorista?.chavePix,
+      titularPix: user?.motorista?.titularPix || user?.nome,
     });
     await abrirWhatsApp(responsavelTel, msg, (erroMsg) =>
       showSnackbar(erroMsg, "error"),
@@ -502,22 +505,26 @@ export default function AlunoDetalheScreen() {
                   <View style={styles.faturaActions}>
                     <Button
                       mode="contained-tonal"
-                      compact
                       icon="check-circle-outline"
                       buttonColor="#DCFCE7"
                       textColor="#166534"
+                      style={styles.faturaActionBtn}
+                      contentStyle={{ minHeight: 48 }}
+                      labelStyle={{ fontWeight: "800" }}
                       onPress={() => handleRegistrarPagamento(fatura)}
                     >
                       Registrar pagamento
                     </Button>
                     <Button
                       mode="outlined"
-                      compact
                       icon="whatsapp"
                       textColor={colors.secondary}
+                      style={styles.faturaActionBtn}
+                      contentStyle={{ minHeight: 48 }}
+                      labelStyle={{ fontWeight: "700" }}
                       onPress={() => handleCobrarWhatsApp(fatura)}
                     >
-                      Cobrar
+                      Notificar
                     </Button>
                   </View>
                 ) : null}
@@ -781,8 +788,12 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   faturaActions: {
-    flexDirection: "row",
     gap: 8,
+    marginTop: 4,
+  },
+  faturaActionBtn: {
+    width: "100%",
+    borderRadius: 10,
   },
   deleteBtn: {
     borderRadius: 12,
