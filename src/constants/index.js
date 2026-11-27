@@ -5,12 +5,14 @@ import { hojeLocal } from "../utils/format";
 export const TURNOS = {
   MANHA: {
     value: "MANHA",
-    label: "Manhã",
+    label: "Manhã (Ida)",
+    shortLabel: "Manhã",
     icon: "weather-sunny",
   },
   TARDE: {
     value: "TARDE",
-    label: "Tarde",
+    label: "Tarde (Volta)",
+    shortLabel: "Tarde",
     icon: "weather-sunset",
   },
 };
@@ -25,23 +27,29 @@ export const MODALIDADES = {
   IDA_E_VOLTA: {
     value: "IDA_E_VOLTA",
     label: "Ida e Volta",
+    shortLabel: "Ida e Volta",
     icon: "swap-horizontal-bold",
     bg: "#DBEAFE",
     color: "#1E40AF",
+    text: "#1E40AF",
   },
   APENAS_IDA: {
     value: "APENAS_IDA",
     label: "Só Ida (Manhã)",
+    shortLabel: "Só Ida",
     icon: "arrow-right-bold",
     bg: "#FFEDD5",
     color: "#9A3412",
+    text: "#9A3412",
   },
   APENAS_VOLTA: {
     value: "APENAS_VOLTA",
     label: "Só Volta (Tarde)",
+    shortLabel: "Só Volta",
     icon: "arrow-left-bold",
     bg: "#EDE9FE",
     color: "#5B21B6",
+    text: "#5B21B6",
   },
 };
 
@@ -53,6 +61,7 @@ export const STATUS_MENSALIDADE = {
     icon: "check-circle",
     bg: "#DCFCE7",
     color: "#166534",
+    text: "#166534",
   },
   PENDENTE: {
     value: "PENDENTE",
@@ -60,6 +69,7 @@ export const STATUS_MENSALIDADE = {
     icon: "clock-outline",
     bg: "#FFEDD5",
     color: "#9A3412",
+    text: "#9A3412",
   },
   ATRASADO: {
     value: "ATRASADO",
@@ -67,13 +77,14 @@ export const STATUS_MENSALIDADE = {
     icon: "alert-circle",
     bg: "#FEE2E2",
     color: "#991B1B",
+    text: "#991B1B",
   },
 };
 
 // Calcula dias em atraso usando a data local de Recife (hojeLocal)
-export const calcularDiasAtrasoLocal = (dataVencimento, status) => {
+export const calcularDiasAtrasoLocal = (dataVencimento, status, hojeRef) => {
   if (status === "PAGO" || !dataVencimento) return 0;
-  const hoje = hojeLocal();
+  const hoje = hojeRef || hojeLocal();
   const venc = String(dataVencimento).split("T")[0];
   if (!/^\d{4}-\d{2}-\d{2}$/.test(venc) || venc >= hoje) return 0;
 
@@ -84,7 +95,7 @@ export const calcularDiasAtrasoLocal = (dataVencimento, status) => {
 };
 
 // Deriva status ATRASADO no cliente quando PENDENTE já passou do vencimento
-export const resolverStatusMensalidade = (mensalidade) => {
+export const resolverStatusMensalidade = (mensalidade, hojeRef) => {
   if (!mensalidade) return { status: "PENDENTE", diasAtraso: 0 };
   if (mensalidade.status === "PAGO") {
     return { status: "PAGO", diasAtraso: 0 };
@@ -92,6 +103,7 @@ export const resolverStatusMensalidade = (mensalidade) => {
   const diasAtraso = calcularDiasAtrasoLocal(
     mensalidade.dataVencimento,
     mensalidade.status,
+    hojeRef,
   );
   const status =
     diasAtraso > 0 || mensalidade.status === "ATRASADO"

@@ -32,10 +32,9 @@ import ErrorState from "../../../components/ErrorState";
 export default function RotasListScreen() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
-  const turnoFiltro = useAppStore((state) => state.turnoFiltro);
-  const setTurnoFiltro = useAppStore((state) => state.setTurnoFiltro);
   const setRotaAtiva = useAppStore((state) => state.setRotaAtiva);
 
+  const [turnoFiltroLocal, setTurnoFiltroLocal] = useState("TODOS");
   const [searchQuery, setSearchQuery] = useState("");
 
   const {
@@ -51,13 +50,13 @@ export default function RotasListScreen() {
     const listaSegura = Array.isArray(rotas) ? rotas : [];
     return listaSegura.filter((rota) => {
       const matchTurno =
-        turnoFiltro === "TODOS" || rota.turno === turnoFiltro;
+        turnoFiltroLocal === "TODOS" || rota.turno === turnoFiltroLocal;
       const matchSearch =
         !searchQuery.trim() ||
         rota.nome?.toLowerCase().includes(searchQuery.trim().toLowerCase());
       return matchTurno && matchSearch;
     });
-  }, [rotas, turnoFiltro, searchQuery]);
+  }, [rotas, turnoFiltroLocal, searchQuery]);
 
   const handleOpenCreate = () => {
     router.push("/(tabs)/rotas/form");
@@ -96,8 +95,8 @@ export default function RotasListScreen() {
         />
 
         <SegmentedButtons
-          value={turnoFiltro}
-          onValueChange={setTurnoFiltro}
+          value={turnoFiltroLocal}
+          onValueChange={setTurnoFiltroLocal}
           buttons={[
             {
               value: "TODOS",
@@ -159,10 +158,10 @@ export default function RotasListScreen() {
             <EmptyState
               icon="map-marker-plus-outline"
               title={
-                turnoFiltro === "TODOS"
+                turnoFiltroLocal === "TODOS"
                   ? "Nenhuma rota escolar cadastrada"
                   : `Nenhuma rota no turno da ${
-                      turnoFiltro === "MANHA" ? "Manhã" : "Tarde"
+                      turnoFiltroLocal === "MANHA" ? "Manhã" : "Tarde"
                     }`
               }
               description="Cadastre os trajetos de ida (manhã) e volta (tarde) da sua van escolar para organizar o embarque dos alunos."

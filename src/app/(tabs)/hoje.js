@@ -48,12 +48,6 @@ export default function HojeScreen() {
   const [atrasosMapa, setAtrasosMapa] = useState({});
   const [avisarTodosVisible, setAvisarTodosVisible] = useState(false);
 
-  useEffect(() => {
-    if (turnoFiltro !== "MANHA" && turnoFiltro !== "TARDE") {
-      setTurnoFiltro("MANHA");
-    }
-  }, [turnoFiltro, setTurnoFiltro]);
-
   const rotasQuery = useRotasQuery();
   const alunosQuery = useAlunosQuery();
 

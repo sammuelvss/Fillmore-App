@@ -32,14 +32,42 @@ import { useAlunosDaRotaQuery } from "../../../hooks/useAlunos";
 import ErrorState from "../../../components/ErrorState";
 import AvisarTodosRotaModal from "../../../components/rotas/AvisarTodosRotaModal";
 
+function gerarNomeRotaDuplicada(nomeOriginal, turnoDestino, labelCurtoDestino) {
+  const base = String(nomeOriginal || "Rota")
+    .replace(/\s*\(undefined\)\s*/gi, "")
+    .trim();
+
+  if (turnoDestino === "TARDE" && /manh[ãa]/i.test(base)) {
+    return base.replace(/manh[ãa]/gi, (match) => {
+      if (match === match.toUpperCase()) return "TARDE";
+      if (match[0] === match[0].toUpperCase()) return "Tarde";
+      return "tarde";
+    });
+  }
+
+  if (turnoDestino === "MANHA" && /tarde/i.test(base)) {
+    return base.replace(/tarde/gi, (match) => {
+      if (match === match.toUpperCase()) return "MANHÃ";
+      if (match[0] === match[0].toUpperCase()) return "Manhã";
+      return "manhã";
+    });
+  }
+
+  const semSufixoTurno = base
+    .replace(/\s*\((manh[ãa]|tarde|ida|volta)\)\s*$/i, "")
+    .trim();
+  return `${semSufixoTurno} (${labelCurtoDestino})`;
+}
+
 /**
  * Detalhe da Rota Escolar — Fase 4
  * Exibe:
  * - Resumo da rota, turno, distância/tempo e barra de ocupação
  * - Ação primária: "Ver trajeto" (52dp, amarelo com texto escuro)
- * - "Gerenciar alunos" (abre lotação da van)
- * - "Duplicar para o outro turno" (cria nova rota com o turno oposto e abre edição)
- * - "Editar rota" e "Excluir rota"
+ * - "Avisar início da rota a todos"
+ * - "Gerenciar alunos da rota" (abre lotação da van)
+ * - "Duplicar para o turno da Tarde/Manhã" (cria nova rota invertendo pontos e abre edição preenchida)
+ * - "Editar dados da rota" e "Excluir esta rota"
  * - Lista de alunos vinculados com toque para abrir o Detalhe do Aluno
  */
 export default function RotaDetalheScreen() {
@@ -88,7 +116,9 @@ export default function RotaDetalheScreen() {
   const isManha = rota.turno === "MANHA";
   const turnoInfo = TURNOS[rota.turno] || TURNOS.MANHA;
   const turnoOposto = isManha ? "TARDE" : "MANHA";
-  const turnoOpostoInfo = TURNOS[turnoOposto];
+  const turnoOpostoInfo = TURNOS[turnoOposto] || TURNOS.TARDE;
+  const labelOposto =
+    turnoOpostoInfo.shortLabel || (turnoOposto === "TARDE" ? "Tarde" : "Manhã");
 
   const capacidadeMaxima =
     rota.motorista?.capacidadeVan || user?.motorista?.capacidadeVan || 15;
@@ -120,10 +150,11 @@ export default function RotaDetalheScreen() {
   };
 
   const handleDuplicarOutroTurno = async () => {
-    const sufixoLimpo = String(rota.nome || "Rota")
-      .replace(/\s*\((manh[ãa]|tarde|ida|volta)\)\s*$/i, "")
-      .trim();
-    const novoNome = `${sufixoLimpo} (${turnoOpostoInfo.shortLabel})`;
+    const novoNome = gerarNomeRotaDuplicada(
+      rota.nome,
+      turnoOposto,
+      labelOposto,
+    );
 
     try {
       const novaRota = await createRotaMutation.mutateAsync({
@@ -150,7 +181,7 @@ export default function RotaDetalheScreen() {
       });
 
       showSnackbar(
-        `Rota duplicada para o turno da ${turnoOpostoInfo.shortLabel}! Revise os dados se desejar.`,
+        `Rota duplicada para o turno da ${labelOposto}! Pontos invertidos automaticamente.`,
         "success",
       );
 
@@ -205,7 +236,7 @@ export default function RotaDetalheScreen() {
               isManha ? styles.manhaChipText : styles.tardeChipText,
             ]}
           >
-            {turnoInfo.label}
+            {turnoInfo.shortLabel || turnoInfo.label}
           </Chip>
 
           <Chip
@@ -259,7 +290,7 @@ export default function RotaDetalheScreen() {
         <View style={styles.capacityBox}>
           <View style={styles.capacityHeader}>
             <Text variant="labelMedium" style={styles.capacityLabel}>
-              Lotação da van neste turno
+              Lotação neste turno
             </Text>
             <Text
               variant="labelMedium"
@@ -270,7 +301,7 @@ export default function RotaDetalheScreen() {
             >
               {isLotada
                 ? "VAN LOTADA"
-                : `${capacidadeMaxima - vagasOcupadas} vagas disponíveis`}
+                : `${capacidadeMaxima - vagasOcupadas} vagas livres`}
             </Text>
           </View>
           <ProgressBar
@@ -280,46 +311,61 @@ export default function RotaDetalheScreen() {
           />
         </View>
 
-        {/* Ação Primária: Ver Trajeto */}
-        <Button
-          mode="contained"
-          icon="navigation-variant"
-          onPress={handleVerTrajeto}
-          buttonColor={colors.primary}
-          textColor={colors.text}
-          style={styles.primaryBtn}
-          contentStyle={styles.primaryBtnContent}
-          labelStyle={styles.primaryBtnLabel}
-        >
-          Ver trajeto
-        </Button>
-
-        {alunos.length > 0 ? (
+        {/* Ações com largura total (sem texto cortado) */}
+        <View style={styles.actionsStack}>
           <Button
-            mode="contained-tonal"
-            icon="whatsapp"
-            onPress={() => setAvisarTodosVisible(true)}
-            buttonColor="#DCFCE7"
-            textColor="#166534"
-            style={styles.duplicateBtn}
-            contentStyle={styles.secondaryBtnContent}
-            labelStyle={{ fontWeight: "800" }}
+            mode="contained"
+            icon="navigation-variant"
+            onPress={handleVerTrajeto}
+            buttonColor={colors.primary}
+            textColor={colors.text}
+            style={styles.fullBtn}
+            contentStyle={styles.primaryBtnContent}
+            labelStyle={styles.primaryBtnLabel}
           >
-            Avisar início da rota a todos ({alunos.length})
+            Ver trajeto
           </Button>
-        ) : null}
 
-        {/* Ações Secundárias */}
-        <View style={styles.secondaryActionsGrid}>
+          {alunos.length > 0 ? (
+            <Button
+              mode="contained-tonal"
+              icon="whatsapp"
+              onPress={() => setAvisarTodosVisible(true)}
+              buttonColor="#DCFCE7"
+              textColor="#166534"
+              style={styles.fullBtn}
+              contentStyle={styles.secondaryBtnContent}
+              labelStyle={styles.actionBtnLabel}
+            >
+              Avisar início da rota a todos ({alunos.length})
+            </Button>
+          ) : null}
+
           <Button
             mode="outlined"
             icon="account-multiple-plus-outline"
             onPress={handleGerenciarAlunos}
             textColor={colors.secondary}
-            style={styles.secondaryBtn}
+            style={styles.outlinedFullBtn}
             contentStyle={styles.secondaryBtnContent}
+            labelStyle={styles.actionBtnLabel}
           >
-            Gerenciar alunos
+            Gerenciar alunos da rota
+          </Button>
+
+          <Button
+            mode="contained-tonal"
+            icon="content-duplicate"
+            onPress={handleDuplicarOutroTurno}
+            loading={createRotaMutation.isPending}
+            disabled={createRotaMutation.isPending}
+            buttonColor={colors.primaryLight}
+            textColor={colors.text}
+            style={styles.fullBtn}
+            contentStyle={styles.secondaryBtnContent}
+            labelStyle={styles.actionBtnLabel}
+          >
+            Duplicar para o turno da {labelOposto}
           </Button>
 
           <Button
@@ -327,32 +373,19 @@ export default function RotaDetalheScreen() {
             icon="pencil-outline"
             onPress={handleEditar}
             textColor={colors.secondary}
-            style={styles.secondaryBtn}
+            style={styles.outlinedFullBtn}
             contentStyle={styles.secondaryBtnContent}
+            labelStyle={styles.actionBtnLabel}
           >
-            Editar
+            Editar dados da rota
           </Button>
         </View>
-
-        <Button
-          mode="contained-tonal"
-          icon="content-duplicate"
-          onPress={handleDuplicarOutroTurno}
-          loading={createRotaMutation.isPending}
-          disabled={createRotaMutation.isPending}
-          buttonColor={colors.primaryLight}
-          textColor={colors.text}
-          style={styles.duplicateBtn}
-          contentStyle={styles.secondaryBtnContent}
-        >
-          Duplicar para o turno da {turnoOpostoInfo.shortLabel}
-        </Button>
       </Surface>
 
       {/* Lista de Alunos Vinculados */}
       <Surface style={styles.sectionCard} elevation={1}>
         <View style={styles.sectionHeaderRow}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text variant="titleMedium" style={styles.sectionTitle}>
               Alunos vinculados ({vagasOcupadas})
             </Text>
@@ -360,15 +393,6 @@ export default function RotaDetalheScreen() {
               Toque em um aluno para ver detalhes ou falar com o responsável
             </Text>
           </View>
-          <Button
-            mode="text"
-            compact
-            icon="seat-passenger"
-            textColor={colors.primaryDark}
-            onPress={handleGerenciarAlunos}
-          >
-            Lotação
-          </Button>
         </View>
 
         <Divider style={styles.divider} />
@@ -610,6 +634,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
   },
   capacityLabel: {
     color: colors.textSecondary,
@@ -620,9 +646,18 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: "#E2E8F0",
   },
-  primaryBtn: {
-    borderRadius: 12,
+  actionsStack: {
+    gap: 10,
     marginTop: 4,
+  },
+  fullBtn: {
+    width: "100%",
+    borderRadius: 12,
+  },
+  outlinedFullBtn: {
+    width: "100%",
+    borderRadius: 12,
+    borderColor: colors.border,
   },
   primaryBtnContent: {
     height: 52,
@@ -631,20 +666,12 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     fontSize: 16,
   },
-  secondaryActionsGrid: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  secondaryBtn: {
-    flex: 1,
-    borderRadius: 12,
-    borderColor: colors.border,
-  },
   secondaryBtnContent: {
     minHeight: 48,
   },
-  duplicateBtn: {
-    borderRadius: 12,
+  actionBtnLabel: {
+    fontWeight: "700",
+    fontSize: 14,
   },
   sectionCard: {
     backgroundColor: colors.surface,
@@ -657,6 +684,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 8,
   },
   sectionTitle: {
     fontWeight: "800",

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -27,12 +27,17 @@ import {
   useCreateRotaMutation,
   useUpdateRotaMutation,
 } from "../../../hooks/useRotas";
-import { BAIRROS_RECIFE, geocodificarEndereco } from "../../../utils/geocoding";
+import {
+  BAIRROS_RECIFE,
+  geocodificarEndereco,
+  geocodificarReverso,
+  identificarBairroPorCoordenadas,
+} from "../../../utils/geocoding";
 
 /**
  * Formulário de Rota Escolar em 3 Etapas — Fase 4
  * Etapa 1: Nome da rota e Turno (Manhã | Tarde)
- * Etapa 2: Ponto inicial e Ponto final (com presets de bairros de Recife e geocodificação)
+ * Etapa 2: Ponto inicial e Ponto final (pré-preenchidos ao editar/duplicar + presets de Recife)
  * Etapa 3: Revisão e botão primário "Salvar rota" (52dp, amarelo com texto escuro)
  */
 export default function RotaFormScreen() {
@@ -45,7 +50,9 @@ export default function RotaFormScreen() {
 
   const [etapa, setEtapa] = useState(1);
 
-  const [nome, setNome] = useState(params.nome ? String(params.nome) : "");
+  const [nome, setNome] = useState(
+    params.nome ? String(params.nome).replace(/\s*\(undefined\)\s*/gi, "") : "",
+  );
   const [turno, setTurno] = useState(
     params.turno === "TARDE" ? "TARDE" : "MANHA",
   );
@@ -63,6 +70,8 @@ export default function RotaFormScreen() {
   );
   const [localPartida, setLocalPartida] = useState("");
   const [localDestino, setLocalDestino] = useState("");
+  const [partidaEditada, setPartidaEditada] = useState(false);
+  const [destinoEditado, setDestinoEditado] = useState(false);
   const [geocodificando, setGeocodificando] = useState(false);
   const [distanciaTotalKm, setDistanciaTotalKm] = useState(
     params.distanciaTotalKm ? String(params.distanciaTotalKm) : "",
@@ -71,6 +80,9 @@ export default function RotaFormScreen() {
     params.tempoEstimadoMin ? String(params.tempoEstimadoMin) : "",
   );
   const [formError, setFormError] = useState("");
+
+  const partidaEditadaRef = useRef(false);
+  const destinoEditadoRef = useRef(false);
 
   const { data: rotaDetalhe, isLoading: loadingDetalhe } = useRotaDetailQuery(
     isEditMode ? rotaId : null,
@@ -82,41 +94,80 @@ export default function RotaFormScreen() {
     });
   }, [isEditMode, navigation]);
 
+  // Carrega dados da rota (em edição ou recém-duplicada) e pré-preenche os nomes dos pontos inicial e final
   useEffect(() => {
-    if (rotaDetalhe) {
-      setNome(rotaDetalhe.nome || "");
-      setTurno(rotaDetalhe.turno === "TARDE" ? "TARDE" : "MANHA");
-      setPontoInicialLat(
-        rotaDetalhe.pontoInicialLat != null
-          ? String(rotaDetalhe.pontoInicialLat)
-          : "",
+    if (!rotaDetalhe) return;
+
+    let cancelado = false;
+
+    const nomeLimpo = String(rotaDetalhe.nome || "").replace(
+      /\s*\(undefined\)\s*/gi,
+      "",
+    );
+    setNome(nomeLimpo);
+    setTurno(rotaDetalhe.turno === "TARDE" ? "TARDE" : "MANHA");
+
+    const latIni = rotaDetalhe.pontoInicialLat;
+    const lngIni = rotaDetalhe.pontoInicialLng;
+    const latFim = rotaDetalhe.pontoFinalLat;
+    const lngFim = rotaDetalhe.pontoFinalLng;
+
+    setPontoInicialLat(latIni != null ? String(latIni) : "");
+    setPontoInicialLng(lngIni != null ? String(lngIni) : "");
+    setPontoFinalLat(latFim != null ? String(latFim) : "");
+    setPontoFinalLng(lngFim != null ? String(lngFim) : "");
+
+    setDistanciaTotalKm(
+      rotaDetalhe.distanciaTotalKm != null
+        ? String(rotaDetalhe.distanciaTotalKm)
+        : "",
+    );
+    setTempoEstimadoMin(
+      rotaDetalhe.tempoEstimadoMin != null
+        ? String(rotaDetalhe.tempoEstimadoMin)
+        : "",
+    );
+
+    setPartidaEditada(false);
+    setDestinoEditado(false);
+    partidaEditadaRef.current = false;
+    destinoEditadoRef.current = false;
+
+    if (latIni != null && lngIni != null) {
+      const imediatoIni = identificarBairroPorCoordenadas(latIni, lngIni);
+      setLocalPartida(
+        imediatoIni || `${Number(latIni).toFixed(4)}, ${Number(lngIni).toFixed(4)}`,
       );
-      setPontoInicialLng(
-        rotaDetalhe.pontoInicialLng != null
-          ? String(rotaDetalhe.pontoInicialLng)
-          : "",
-      );
-      setPontoFinalLat(
-        rotaDetalhe.pontoFinalLat != null
-          ? String(rotaDetalhe.pontoFinalLat)
-          : "",
-      );
-      setPontoFinalLng(
-        rotaDetalhe.pontoFinalLng != null
-          ? String(rotaDetalhe.pontoFinalLng)
-          : "",
-      );
-      setDistanciaTotalKm(
-        rotaDetalhe.distanciaTotalKm != null
-          ? String(rotaDetalhe.distanciaTotalKm)
-          : "",
-      );
-      setTempoEstimadoMin(
-        rotaDetalhe.tempoEstimadoMin != null
-          ? String(rotaDetalhe.tempoEstimadoMin)
-          : "",
-      );
+      if (!imediatoIni) {
+        geocodificarReverso(latIni, lngIni).then((nomeResolvido) => {
+          if (!cancelado && !partidaEditadaRef.current && nomeResolvido) {
+            setLocalPartida(nomeResolvido);
+          }
+        });
+      }
+    } else {
+      setLocalPartida("");
     }
+
+    if (latFim != null && lngFim != null) {
+      const imediatoFim = identificarBairroPorCoordenadas(latFim, lngFim);
+      setLocalDestino(
+        imediatoFim || `${Number(latFim).toFixed(4)}, ${Number(lngFim).toFixed(4)}`,
+      );
+      if (!imediatoFim) {
+        geocodificarReverso(latFim, lngFim).then((nomeResolvido) => {
+          if (!cancelado && !destinoEditadoRef.current && nomeResolvido) {
+            setLocalDestino(nomeResolvido);
+          }
+        });
+      }
+    } else {
+      setLocalDestino("");
+    }
+
+    return () => {
+      cancelado = true;
+    };
   }, [rotaDetalhe]);
 
   const createMutation = useCreateRotaMutation();
@@ -160,25 +211,44 @@ export default function RotaFormScreen() {
       return;
     }
 
-    if (localPartida.trim() || localDestino.trim()) {
+    const precisaGeoPartida = partidaEditada && Boolean(localPartida.trim());
+    const precisaGeoDestino = destinoEditado && Boolean(localDestino.trim());
+
+    if (precisaGeoPartida || precisaGeoDestino) {
       setGeocodificando(true);
       try {
-        if (localPartida.trim()) {
+        if (precisaGeoPartida) {
           const geoIni = await geocodificarEndereco(localPartida);
           if (geoIni) {
             setPontoInicialLat(String(geoIni.latitude));
             setPontoInicialLng(String(geoIni.longitude));
           }
+        } else if (partidaEditada && !localPartida.trim()) {
+          setPontoInicialLat("");
+          setPontoInicialLng("");
         }
-        if (localDestino.trim()) {
+
+        if (precisaGeoDestino) {
           const geoFim = await geocodificarEndereco(localDestino);
           if (geoFim) {
             setPontoFinalLat(String(geoFim.latitude));
             setPontoFinalLng(String(geoFim.longitude));
           }
+        } else if (destinoEditado && !localDestino.trim()) {
+          setPontoFinalLat("");
+          setPontoFinalLng("");
         }
       } finally {
         setGeocodificando(false);
+      }
+    } else {
+      if (partidaEditada && !localPartida.trim()) {
+        setPontoInicialLat("");
+        setPontoInicialLng("");
+      }
+      if (destinoEditado && !localDestino.trim()) {
+        setPontoFinalLat("");
+        setPontoFinalLng("");
       }
     }
 
@@ -232,6 +302,14 @@ export default function RotaFormScreen() {
   }
 
   const turnoInfo = TURNOS[turno] || TURNOS.MANHA;
+  const temCoordsIni =
+    pontoInicialLat !== "" &&
+    pontoInicialLng !== "" &&
+    !Number.isNaN(Number(pontoInicialLat));
+  const temCoordsFim =
+    pontoFinalLat !== "" &&
+    pontoFinalLng !== "" &&
+    !Number.isNaN(Number(pontoFinalLat));
 
   return (
     <KeyboardAvoidingView
@@ -358,10 +436,29 @@ export default function RotaFormScreen() {
                 placeholder="Ex.: Boa Viagem ou Av. Conselheiro Aguiar"
                 mode="outlined"
                 value={localPartida}
-                onChangeText={setLocalPartida}
+                onChangeText={(v) => {
+                  setLocalPartida(v);
+                  setPartidaEditada(true);
+                  partidaEditadaRef.current = true;
+                }}
                 left={<TextInput.Icon icon="map-marker-outline" />}
                 style={styles.input}
               />
+              {temCoordsIni && !partidaEditada ? (
+                <View style={styles.coordsSavedBadge}>
+                  <MaterialCommunityIcons
+                    name="check-circle"
+                    size={15}
+                    color={colors.success}
+                  />
+                  <Text variant="labelSmall" style={styles.coordsSavedText}>
+                    Ponto inicial salvo no mapa (
+                    {Number(pontoInicialLat).toFixed(4)},{" "}
+                    {Number(pontoInicialLng).toFixed(4)})
+                  </Text>
+                </View>
+              ) : null}
+
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -374,8 +471,10 @@ export default function RotaFormScreen() {
                     selected={localPartida === b.label}
                     onPress={() => {
                       setLocalPartida(b.label);
-                      setPontoInicialLat(String(b.lat));
-                      setPontoInicialLng(String(b.lng));
+                      setPontoInicialLat(String(b.latitude));
+                      setPontoInicialLng(String(b.longitude));
+                      setPartidaEditada(false);
+                      partidaEditadaRef.current = true;
                     }}
                     style={styles.bairroChip}
                   >
@@ -389,10 +488,29 @@ export default function RotaFormScreen() {
                 placeholder="Ex.: Colégio Santa Maria ou Derby"
                 mode="outlined"
                 value={localDestino}
-                onChangeText={setLocalDestino}
+                onChangeText={(v) => {
+                  setLocalDestino(v);
+                  setDestinoEditado(true);
+                  destinoEditadoRef.current = true;
+                }}
                 left={<TextInput.Icon icon="flag-checkered" />}
                 style={styles.input}
               />
+              {temCoordsFim && !destinoEditado ? (
+                <View style={styles.coordsSavedBadge}>
+                  <MaterialCommunityIcons
+                    name="check-circle"
+                    size={15}
+                    color={colors.success}
+                  />
+                  <Text variant="labelSmall" style={styles.coordsSavedText}>
+                    Ponto final salvo no mapa (
+                    {Number(pontoFinalLat).toFixed(4)},{" "}
+                    {Number(pontoFinalLng).toFixed(4)})
+                  </Text>
+                </View>
+              ) : null}
+
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -405,8 +523,10 @@ export default function RotaFormScreen() {
                     selected={localDestino === b.label}
                     onPress={() => {
                       setLocalDestino(b.label);
-                      setPontoFinalLat(String(b.lat));
-                      setPontoFinalLng(String(b.lng));
+                      setPontoFinalLat(String(b.latitude));
+                      setPontoFinalLng(String(b.longitude));
+                      setDestinoEditado(false);
+                      destinoEditadoRef.current = true;
                     }}
                     style={styles.bairroChip}
                   >
@@ -543,14 +663,14 @@ export default function RotaFormScreen() {
                     <Text variant="bodyMedium" style={styles.reviewValue}>
                       Partida:{" "}
                       {localPartida.trim() ||
-                        (pontoInicialLat
+                        (temCoordsIni
                           ? `GPS (${Number(pontoInicialLat).toFixed(4)}, ${Number(pontoInicialLng).toFixed(4)})`
                           : "Automático pelos alunos")}
                     </Text>
                     <Text variant="bodyMedium" style={styles.reviewValue}>
                       Destino:{" "}
                       {localDestino.trim() ||
-                        (pontoFinalLat
+                        (temCoordsFim
                           ? `GPS (${Number(pontoFinalLat).toFixed(4)}, ${Number(pontoFinalLng).toFixed(4)})`
                           : "Automático pelos alunos")}
                     </Text>
@@ -690,8 +810,23 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    marginBottom: 12,
+    marginBottom: 8,
     backgroundColor: colors.surface,
+  },
+  coordsSavedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "#DCFCE7",
+    borderRadius: 8,
+    alignSelf: "flex-start",
+  },
+  coordsSavedText: {
+    color: "#166534",
+    fontWeight: "700",
   },
   segmented: {
     marginBottom: 12,
